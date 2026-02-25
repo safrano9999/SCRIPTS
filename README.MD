@@ -13,27 +13,36 @@
 
 ### Installation
 
-#### 1. Install the script
+#### 1. Clone the repo
 
 ```bash
-cp note ~/.local/bin/note
-chmod +x ~/.local/bin/note
+git clone https://github.com/yourusername/SCRIPTS.git ~/Skripte
 ```
+
+#### 2. Symlink the script into your PATH
+
+```bash
+ln -s ~/Skripte/note ~/.local/bin/note
+```
+
+No copying needed — changes in the repo are live immediately.
 
 #### 2. Create note_config in the same directory
 
-Create a file called `note_config` next to the script — add one line with the path to your folder:
+Create a file called `note_config` next to the script — add one line with the path to your folder (may vary to your setup):
 
 ```
 PATH_YNOTE=/home/youruser/obsidian/linux
 ```
 
-#### 3. Add to ~/.bashrc
+#### 4. Add to ~/.bashrc
 
 ```bash
 echo "alias note='history -a; ~/.local/bin/note'" >> ~/.bashrc
-source ~/.bashrc
+echo 'export PATH="$HOME/.local/bin:$HOME/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"' >> ~/.bashrc
 ```
+
+Then reload: `source ~/.bashrc`
 
 ### Usage
 
