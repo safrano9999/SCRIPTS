@@ -1,6 +1,6 @@
 # Here are some useful scripts, mostly in Bash
 
-## note – Terminal to Obsidian in One Command
+## note – Terminal to MD-File in One Command
 
 > Looking for a solution to remember important commands or codeblocks?
 > Just type `note "and a note"` and your last command will be saved immediately in a Markdown file named after its command.
