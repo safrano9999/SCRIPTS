@@ -91,3 +91,44 @@ note --block mysql "all users"
 echo "hello"
 ```
 ~~~
+
+# I_dont_care_about_versioning.sh 🚀
+
+Simples Bash-Script zum schnellen Pushen auf GitHub – ohne Schnickschnack.
+
+## Usage
+
+```bash
+./push.sh <githubuser> [--auth] [--init] [--reset] [-m "msg"]
+```
+
+## Flags
+
+| Flag | Was es macht |
+|------|-------------|
+| `--auth` | 🔐 GitHub Login via `gh auth login` |
+| `--init` | 🛠️ Repo lokal initialisieren & Remote setzen |
+| `--reset` | 💥 Komplette History löschen & neu hochladen |
+| `-m "msg"` | 💬 Eigene Commit Message (sonst: aktuelles Datum) |
+
+## Beispiele
+
+```bash
+# Neues Projekt einrichten
+./push.sh meinuser --auth --init --reset -m "initial commit"
+
+# History komplett wegwerfen
+./push.sh meinuser --reset -m "clean start"
+
+# Normaler Push
+./push.sh meinuser -m "fix bug"
+
+# Push ohne Message → nimmt Timestamp
+./push.sh meinuser
+```
+
+## ⚠️ Hinweise
+
+- Der **Ordnername** muss mit dem **GitHub Repo-Namen** übereinstimmen
+- Bei `--reset` wird die gesamte Git-History unwiderruflich gelöscht
+- Bei geschützten Branches (`main`) → Branch Protection in den GitHub Repo-Settings deaktivieren
