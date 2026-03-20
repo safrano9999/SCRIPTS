@@ -32,16 +32,22 @@ LAST_CMD=$(tail -n 20 "$HISTFILE_PATH" \
 
 [ -z "$LAST_CMD" ] && { echo "❌ Fehler: Befehl nicht gefunden."; exit 1; }
 
-if [[ $USER_OFFSET -gt 0 ]]; then
+mkdir -p "$PATH_YNOTE"
+
+if [[ "$1" == /* ]]; then
+    EXE_NAME="${1#/}"
+    shift
+    COMMENT="$*"
+elif [[ $USER_OFFSET -gt 0 ]]; then
     EXE_NAME="block"
+    COMMENT="$*"
 elif [[ "$LAST_CMD" == *"|"* ]]; then
     EXE_NAME="pipes"
+    COMMENT="$*"
 else
     EXE_NAME=$(echo "$LAST_CMD" | awk '{if($1=="sudo") print $2; else print $1}' | xargs basename)
+    COMMENT="$*"
 fi
-
-mkdir -p "$PATH_YNOTE"
-COMMENT="$*"
 
 printf -- '---\n**%s** %s\n```bash\n%s\n```\n' "${COMMENT:-ohne Kommentar}" "$(date '+%Y-%m-%d %H:%M')" "$LAST_CMD" >> "$PATH_YNOTE/$EXE_NAME.md"
 
