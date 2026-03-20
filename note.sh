@@ -1,6 +1,7 @@
 #!/bin/bash
 
-PATH_YNOTE="$HOME/obsidian/linux"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/note_config"
 HISTFILE_PATH="${HISTFILE:-$HOME/.bash_history}"
 
 # --block Modus
@@ -35,9 +36,14 @@ LAST_CMD=$(tail -n 20 "$HISTFILE_PATH" \
 mkdir -p "$PATH_YNOTE"
 
 if [[ "$1" == /* ]]; then
-    EXE_NAME="${1#/}"
-    shift
-    COMMENT="$*"
+    _slash="${1#/}"
+    EXE_NAME="${_slash%% *}"
+    if [[ "$_slash" == *" "* ]]; then
+        COMMENT="${_slash#* }"
+    else
+        shift
+        COMMENT="$*"
+    fi
 elif [[ $USER_OFFSET -gt 0 ]]; then
     EXE_NAME="block"
     COMMENT="$*"
