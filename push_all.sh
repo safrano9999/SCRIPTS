@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"
 ACCOUNT="$(basename "$BASE_DIR")"
 TIMESTAMP="$(date '+%Y-%m-%d %H:%M')"
