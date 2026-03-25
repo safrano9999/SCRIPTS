@@ -1,0 +1,1 @@
+touch /srv/shared/projekte/TRIGGERDIR/M
