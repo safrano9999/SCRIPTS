@@ -27,7 +27,11 @@ while IFS= read -r gitdir; do
   repo="$(dirname "$gitdir")"
   name="$(basename "$repo")"
 
-  [ "$repo" = "$BASE_DIR" ] && name="(root)"
+  if [ "$repo" = "$BASE_DIR" ]; then
+    echo "── (root) ── übersprungen (nur Unterordner werden gepusht)"
+    echo
+    continue
+  fi
 
   echo "── $name ──"
   cd "$repo"
@@ -59,6 +63,24 @@ while IFS= read -r gitdir; do
 
   total=$(echo "$changes" | wc -l)
   echo "   $total geänderte Datei(en)"
+
+  # Sicherheitscheck: Abbruch wenn sensible Dateien staged würden
+  FORBIDDEN_PATTERNS=("*env" "*.env" "venv/" ".venv/" "__pycache__/" "node_modules/" "*.pyc" ".env.*")
+  blocked=""
+  for pat in "${FORBIDDEN_PATTERNS[@]}"; do
+    matches=$(echo "$changes" | grep -E "$(echo "$pat" | sed 's/\*/.*/')" || true)
+    if [ -n "$matches" ]; then
+      blocked+="$matches"$'\n'
+    fi
+  done
+  if [ -n "$blocked" ]; then
+    echo "   ⚠ ABBRUCH — sensible Dateien erkannt (nicht in .gitignore?):"
+    echo "$blocked" | head -5 | sed 's/^/      /'
+    echo "   → .gitignore prüfen! Übersprungen."
+    ((failed++)) || true
+    echo
+    continue
+  fi
 
   # Commit & Push
   git add -A
