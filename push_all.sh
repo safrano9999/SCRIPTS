@@ -20,7 +20,9 @@ echo "========================================="
 echo
 
 pushed=0
-skipped=0
+uptodate=0
+no_remote=0
+wrong_account=0
 failed=0
 
 while IFS= read -r gitdir; do
@@ -39,15 +41,15 @@ while IFS= read -r gitdir; do
   # Prüfe ob origin auf den richtigen Account zeigt
   origin=$(git remote get-url origin 2>/dev/null || echo "")
   if [ -z "$origin" ]; then
-    echo "   Kein remote 'origin' — übersprungen"
-    ((skipped++)) || true
+    echo "   Kein remote 'origin'"
+    ((no_remote++)) || true
     echo
     continue
   fi
 
   if ! echo "$origin" | grep -qi "$ACCOUNT"; then
-    echo "   Origin gehört nicht zu $ACCOUNT — übersprungen"
-    ((skipped++)) || true
+    echo "   Origin gehört nicht zu $ACCOUNT"
+    ((wrong_account++)) || true
     echo
     continue
   fi
@@ -55,8 +57,8 @@ while IFS= read -r gitdir; do
   # Status prüfen
   changes=$(git status --porcelain 2>/dev/null)
   if [ -z "$changes" ]; then
-    echo "   Keine Änderungen"
-    ((skipped++)) || true
+    echo "   Aktuell ✓"
+    ((uptodate++)) || true
     echo
     continue
   fi
@@ -102,4 +104,4 @@ while IFS= read -r gitdir; do
 done < <(find "$BASE_DIR" -maxdepth 3 -name ".git" -type d 2>/dev/null | sort)
 
 echo "========================================="
-echo "Gepusht: $pushed  Übersprungen: $skipped  Fehler: $failed"
+echo "Gepusht: $pushed  Aktuell: $uptodate  Kein Remote: $no_remote  Anderer Account: $wrong_account  Fehler: $failed"
