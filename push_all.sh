@@ -83,7 +83,12 @@ while IFS= read -r gitdir; do
   fi
 
   # Commit & Push
-  git add -A
+  if ! git add -A 2>&1 | sed 's/^/   /'; then
+    echo "   → git add fehlgeschlagen (Submodul-Problem?)"
+    ((failed++)) || true
+    echo
+    continue
+  fi
   git commit -m "sync $TIMESTAMP" 2>&1 | tail -1 | sed 's/^/   /'
   if git push origin HEAD 2>&1 | sed 's/^/   /'; then
     echo "   → OK"
