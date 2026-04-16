@@ -7,8 +7,9 @@ Usage — add this as first import in every entrypoint:
 
 How it works:
   1. Loads .env from the calling script's directory (if present)
-  2. Container-injected env vars (--env-file) take precedence over .env
-  3. All values are accessible via env dict, get(), or os.environ
+  2. Loads provider.env (LiteLLM sdk provider keys) if present
+  3. Container-injected env vars (--env-file) take precedence
+  4. All values are accessible via env dict, get(), or os.environ
 
 Requires: pip install python-dotenv
 """
@@ -31,9 +32,14 @@ def _find_env_file() -> Path:
     return Path.cwd() / ".env"
 
 
-# Load .env — override=False means os.environ (container injection) wins
-_env_path = _find_env_file()
-load_dotenv(_env_path, override=False)
+# Load all env files from the script's directory
+# .env first, then *.env — override=False means os.environ (container injection) wins
+_env_dir = _find_env_file().parent
+_dot_env = _env_dir / ".env"
+if _dot_env.exists():
+    load_dotenv(_dot_env, override=False)
+for _ef in sorted(_env_dir.glob("*.env")):
+    load_dotenv(_ef, override=False)
 
 
 def get(key: str, default: str = "") -> str:
