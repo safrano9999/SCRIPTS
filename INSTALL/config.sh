@@ -146,6 +146,7 @@ configure_from_example() {
     local example="$1"
     local target="$2"
     local label="$3"
+    local env_existing=""
 
     [ -f "$example" ] || return 0
 
@@ -189,13 +190,30 @@ configure_from_example() {
         fi
         seen_keys[$key]=1
 
+        env_existing=""
+        if [ "$(basename "$target")" = "config.conf" ]; then
+            env_existing="$(read_kv_file "$DIR/.env" "$key" || true)"
+        fi
+
         existing_line="$(grep "^${key}=" "$target" 2>/dev/null | head -1 || true)"
         existing="${existing_line#*=}"
+        if [ -n "$existing_line" ] && [ -z "$existing" ] && [ -n "$env_existing" ]; then
+            sed -i "/^${key}=/d" "$target" 2>/dev/null || true
+            echo "$key=$env_existing" >> "$target"
+            echo "    $key= migrated from .env"
+            continue
+        fi
         if [ -n "$existing_line" ] && { [ "$required" != "true" ] || [ -n "$existing" ]; }; then
             echo "    $key= exists"
             continue
         fi
         sed -i "/^${key}=$/d" "$target" 2>/dev/null || true
+
+        if [ -n "$env_existing" ]; then
+            echo "$key=$env_existing" >> "$target"
+            echo "    $key= migrated from .env"
+            continue
+        fi
 
         while :; do
             used_prefill=false
