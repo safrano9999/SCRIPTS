@@ -65,6 +65,83 @@ add_unique() {
     target+=("$value")
 }
 
+rewrite_config_with_comments() {
+    local example="$1"
+    local target="$2"
+    local tmp
+
+    [ "$(basename "$target")" = "config.conf" ] || return 0
+    [ -f "$example" ] || return 0
+    [ -f "$target" ] || return 0
+
+    tmp="$(mktemp)"
+    awk -v target="$target" '
+    function trim(s) {
+        sub(/^[[:space:]]+/, "", s)
+        sub(/[[:space:]]+$/, "", s)
+        return s
+    }
+    function parse_env(line, parsed,    entry) {
+        entry = line
+        sub(/#.*/, "", entry)
+        entry = trim(entry)
+        if (entry !~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/) return 0
+        parsed["key"] = entry
+        sub(/[[:space:]]*=.*/, "", parsed["key"])
+        parsed["key"] = trim(parsed["key"])
+        parsed["value"] = entry
+        sub(/^[^=]*=/, "", parsed["value"])
+        parsed["value"] = trim(parsed["value"])
+        return 1
+    }
+    BEGIN {
+        while ((getline line < target) > 0) {
+            if (parse_env(line, parsed)) {
+                if (!(parsed["key"] in current)) order[++order_count] = parsed["key"]
+                current[parsed["key"]] = parsed["value"]
+            }
+        }
+        close(target)
+    }
+    {
+        raw = $0
+        stripped = trim(raw)
+        if (stripped == "") {
+            pending[++pending_count] = raw
+            next
+        }
+        if (substr(stripped, 1, 1) == "#") {
+            comment = trim(substr(stripped, 2))
+            if (comment ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/) next
+            pending[++pending_count] = raw
+            next
+        }
+        if (!parse_env(raw, parsed)) {
+            pending_count = 0
+            next
+        }
+
+        key = parsed["key"]
+        value = (key in current) ? current[key] : parsed["value"]
+        for (i = 1; i <= pending_count; i++) print pending[i]
+        print key "=" value
+        written[key] = 1
+        pending_count = 0
+    }
+    END {
+        for (i = 1; i <= order_count; i++) {
+            key = order[i]
+            if (key in written) continue
+            if (!printed_extra) {
+                print "# Additional local values"
+                printed_extra = 1
+            }
+            print key "=" current[key]
+        }
+    }' "$example" > "$tmp"
+    mv "$tmp" "$target"
+}
+
 configure_from_example() {
     local example="$1"
     local target="$2"
@@ -112,8 +189,9 @@ configure_from_example() {
         fi
         seen_keys[$key]=1
 
-        existing="$(grep "^${key}=" "$target" 2>/dev/null | head -1 | cut -d= -f2- || true)"
-        if [ -n "$existing" ]; then
+        existing_line="$(grep "^${key}=" "$target" 2>/dev/null | head -1 || true)"
+        existing="${existing_line#*=}"
+        if [ -n "$existing_line" ] && { [ "$required" != "true" ] || [ -n "$existing" ]; }; then
             echo "    $key= exists"
             continue
         fi
@@ -158,6 +236,8 @@ configure_from_example() {
         fi
         echo "$key=$val" >> "$target"
     done 3< "$example"
+
+    rewrite_config_with_comments "$example" "$target"
 }
 
 existing_image() {
