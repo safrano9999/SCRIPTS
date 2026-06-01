@@ -52,6 +52,89 @@ config_value() {
     return 1
 }
 
+provider_names_from_conf() {
+    local provider_file="$1"
+    local section name
+
+    [ -f "$provider_file" ] || return 0
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="$(trim "$line")"
+        [[ "$line" =~ ^\[provider\.([^]]+)\]$ ]] || continue
+        name="${BASH_REMATCH[1],,}"
+        printf '%s\n' "$name"
+    done < "$provider_file"
+}
+
+provider_file_for_example() {
+    local example="$1"
+    local key="${2:-}"
+    local base prefix candidate
+
+    base="$(dirname "$example")"
+    if [ -f "$base/provider.conf" ]; then
+        printf '%s\n' "$base/provider.conf"
+        return 0
+    fi
+    if [ -f "$DIR/provider.conf" ]; then
+        printf '%s\n' "$DIR/provider.conf"
+        return 0
+    fi
+    if [ -n "$key" ] && [[ "$key" == *_PROVIDER* ]]; then
+        prefix="${key%%_PROVIDER*}"
+        candidate="$DIR/safrano9999/${prefix,,}-provider.conf"
+        if [ -f "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    fi
+    for candidate in "$DIR"/safrano9999/*-provider.conf; do
+        [ -f "$candidate" ] || continue
+        printf '%s\n' "$candidate"
+        return 0
+    done
+    return 1
+}
+
+provider_prompt() {
+    local example="$1"
+    local key="${2:-}"
+    local provider_file
+    local -a names=()
+    local name index=1
+
+    provider_file="$(provider_file_for_example "$example" "$key" || true)"
+    [ -n "$provider_file" ] || return 0
+    while IFS= read -r name || [ -n "$name" ]; do
+        [ -n "$name" ] || continue
+        names+=("$name")
+    done < <(provider_names_from_conf "$provider_file")
+    [ "${#names[@]}" -gt 0 ] || return 0
+
+    for name in "${names[@]}"; do
+        printf '(%s) %s ' "$index" "$name"
+        index=$((index + 1))
+    done
+}
+
+normalize_provider_value() {
+    local example="$1"
+    local key="$2"
+    local value="$3"
+    local provider_file name index=1
+
+    provider_file="$(provider_file_for_example "$example" "$key" || true)"
+    if [ -n "$provider_file" ] && [[ "$value" =~ ^[0-9]+$ ]]; then
+        while IFS= read -r name || [ -n "$name" ]; do
+            if [ "$index" -eq "$value" ]; then
+                printf '%s\n' "$name"
+                return 0
+            fi
+            index=$((index + 1))
+        done < <(provider_names_from_conf "$provider_file")
+    fi
+    printf '%s\n' "${value,,}"
+}
+
 add_unique() {
     local value="$1"
     shift
@@ -70,7 +153,6 @@ rewrite_config_with_comments() {
     local target="$2"
     local tmp
 
-    [ "$(basename "$target")" = "config.conf" ] || return 0
     [ -f "$example" ] || return 0
     [ -f "$target" ] || return 0
 
@@ -81,8 +163,16 @@ rewrite_config_with_comments() {
         sub(/[[:space:]]+$/, "", s)
         return s
     }
-    function parse_env(line, parsed,    entry) {
+    function parse_env(line, parsed, allow_commented,    entry) {
         entry = line
+        parsed["commented"] = 0
+        sub(/^[[:space:]]+/, "", entry)
+        if (allow_commented && substr(entry, 1, 1) == "#") {
+            entry = substr(entry, 2)
+            parsed["commented"] = 1
+        } else if (substr(entry, 1, 1) == "#") {
+            return 0
+        }
         sub(/#.*/, "", entry)
         entry = trim(entry)
         if (entry !~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/) return 0
@@ -96,7 +186,8 @@ rewrite_config_with_comments() {
     }
     BEGIN {
         while ((getline line < target) > 0) {
-            if (parse_env(line, parsed)) {
+            delete parsed
+            if (parse_env(line, parsed, 0)) {
                 if (!(parsed["key"] in current)) order[++order_count] = parsed["key"]
                 current[parsed["key"]] = parsed["value"]
             }
@@ -110,22 +201,25 @@ rewrite_config_with_comments() {
             pending[++pending_count] = raw
             next
         }
-        if (substr(stripped, 1, 1) == "#") {
-            comment = trim(substr(stripped, 2))
-            if (comment ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/) next
-            pending[++pending_count] = raw
-            next
-        }
-        if (!parse_env(raw, parsed)) {
+        delete parsed
+        if (parse_env(raw, parsed, 1)) {
+            key = parsed["key"]
+            value = (key in current) ? current[key] : parsed["value"]
+            for (i = 1; i <= pending_count; i++) print pending[i]
+            if (parsed["commented"] && !(key in current)) {
+                print "# " key "=" value
+            } else {
+                print key "=" value
+                written[key] = 1
+            }
             pending_count = 0
             next
         }
-
-        key = parsed["key"]
-        value = (key in current) ? current[key] : parsed["value"]
-        for (i = 1; i <= pending_count; i++) print pending[i]
-        print key "=" value
-        written[key] = 1
+        if (substr(stripped, 1, 1) == "#") {
+            comment = trim(substr(stripped, 2))
+            pending[++pending_count] = raw
+            next
+        }
         pending_count = 0
     }
     END {
@@ -218,19 +312,26 @@ configure_from_example() {
         while :; do
             used_prefill=false
             read_status=0
+            prompt_suffix=""
+            if [[ "$key" == ZEROINBOX_PROVIDER* && "$key" != ZEROINBOX_PROVIDER_*_* ]]; then
+                prompt_suffix="$(provider_prompt "$example" "$key")"
+            fi
             if [ -n "$default" ] && [ -t 0 ]; then
-                read -e -i "$default" -r -p "    $key: " val || read_status=$?
+                read -e -i "$default" -r -p "    $key ${prompt_suffix}: " val || read_status=$?
                 used_prefill=true
             else
                 if [ -n "$default" ]; then
-                    printf "    %s [%s]: " "$key" "$default"
+                    printf "    %s %s[%s]: " "$key" "$prompt_suffix" "$default"
                 else
-                    printf "    %s: " "$key"
+                    printf "    %s %s: " "$key" "$prompt_suffix"
                 fi
                 read -r val || read_status=$?
             fi
             if [ "$used_prefill" != "true" ] && [ -z "$val" ]; then
                 val="$default"
+            fi
+            if [[ "$key" == ZEROINBOX_PROVIDER* && "$key" != ZEROINBOX_PROVIDER_*_* ]]; then
+                val="$(normalize_provider_value "$example" "$key" "$val")"
             fi
             if [ "$required" != "true" ] || [ -n "$val" ]; then
                 break
