@@ -1,0 +1,19 @@
+[Unit]
+Description=Configure OpenClaw before gateway start
+After=tailscale-up.service
+Wants=tailscale-up.service
+Before=openclaw.service
+
+[Service]
+Type=oneshot
+PassEnvironment=OPENCLAW_START OPENCLAW_GATEWAY_TOKEN OPENCLAW_GATEWAY_PORT OPENCLAW_GATEWAY_PUBLISH_PORT TELEGRAMTOKEN_OPENCLAW HOST TS_HOSTNAME OPENCLAW_AGENT_WORKSPACE OPENCLAW_WORKSPACE_DIR
+# Fedora-style LiteLLM/OpenClaw-Harness env, intentionally inactive in the shared base:
+# PassEnvironment=LITELLM_API_KEY LITELLM_URL LITELLM_PORT OPENCLAW_LITELLM_MODEL OPENCLAW_LITELLM_MODEL_NAME OPENCLAW_LITELLM_CONTEXT_WINDOW OPENCLAW_LITELLM_MAX_TOKENS
+ExecCondition=/bin/bash -c '[ "$${OPENCLAW_START:-1}" = "1" ]'
+# Fedora-style LiteLLM/OpenClaw-Harness condition, activated by fedora43-ai drop-in:
+# ExecCondition=/bin/bash -c '[ -n "$$LITELLM_API_KEY" ] && [ -n "$$LITELLM_URL" ] && [ -n "$$LITELLM_PORT" ]'
+ExecStart=/usr/local/bin/openclaw-configure
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

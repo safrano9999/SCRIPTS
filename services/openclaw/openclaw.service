@@ -1,0 +1,20 @@
+[Unit]
+Description=OpenClaw gateway
+After=tailscale-up.service openclaw-config.service
+Wants=tailscale-up.service
+
+[Service]
+Type=simple
+PassEnvironment=OPENCLAW_START OPENCLAW_GATEWAY_TOKEN OPENCLAW_GATEWAY_PORT
+# Fedora-style LiteLLM/OpenClaw-Harness env, intentionally inactive in the shared base:
+# PassEnvironment=LITELLM_API_KEY LITELLM_URL LITELLM_PORT OPENCLAW_LITELLM_MODEL OPENCLAW_LITELLM_MODEL_NAME OPENCLAW_LITELLM_CONTEXT_WINDOW OPENCLAW_LITELLM_MAX_TOKENS
+Environment=HOME=/root
+ExecCondition=/bin/bash -c '[ "$${OPENCLAW_START:-1}" = "1" ]'
+# Fedora-style LiteLLM/OpenClaw-Harness condition, activated by fedora43-ai drop-in:
+# ExecCondition=/bin/bash -c '[ -n "$$LITELLM_API_KEY" ] && [ -n "$$LITELLM_URL" ] && [ -n "$$LITELLM_PORT" ]'
+ExecStart=/bin/bash -lc 'args=(gateway run --bind lan --port "$${OPENCLAW_GATEWAY_PORT:-18789}"); if [ -n "$${OPENCLAW_GATEWAY_TOKEN:-}" ]; then args+=(--auth token --token "$$OPENCLAW_GATEWAY_TOKEN"); fi; exec /usr/local/bin/openclaw "$${args[@]}"'
+Restart=always
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

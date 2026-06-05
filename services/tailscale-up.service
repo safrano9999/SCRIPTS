@@ -1,0 +1,15 @@
+[Unit]
+Description=Tailscale up (authkey join)
+After=tailscaled.service
+Wants=tailscaled.service
+
+[Service]
+Type=oneshot
+PassEnvironment=TS_AUTHKEY TS_HOSTNAME
+ExecCondition=/bin/bash -c '[ -n "$$TS_AUTHKEY" ]'
+ExecStart=/bin/bash -c 'args=(up --authkey="$$TS_AUTHKEY" --accept-routes --accept-dns); [ -n "$$TS_HOSTNAME" ] && args+=(--hostname="$$TS_HOSTNAME"); exec /usr/bin/tailscale "$${args[@]}"'
+RemainAfterExit=yes
+TimeoutStartSec=30
+
+[Install]
+WantedBy=multi-user.target
