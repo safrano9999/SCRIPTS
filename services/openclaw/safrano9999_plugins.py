@@ -17,6 +17,51 @@ from typing import Any, Callable, Iterable
 DEFAULT_CRONTAB_SPEC = "CET 07:00,CET 12:00,CET 15:30,CET 19:00"
 DEFAULT_CRON_MESSAGE = "/dailynews\n/calendar\n/zeroinbox\n/kachelmann status"
 CRON_JOB_PREFIX = "safrano9999-routines-"
+OPENCLAW_CRON_STORE_JS = r"""
+import fs from "node:fs";
+import { pathToFileURL } from "node:url";
+
+const storePath = process.argv[1];
+const prefix = process.argv[2];
+const requested = JSON.parse(fs.readFileSync(0, "utf8"));
+const distDirs = [
+  process.env.OPENCLAW_DIST_DIR,
+  "/usr/local/lib/node_modules/openclaw/dist",
+  "/app/dist",
+].filter(Boolean);
+
+let loadStore;
+let saveStore;
+for (const distDir of distDirs) {
+  if (!fs.existsSync(distDir)) continue;
+  for (const file of fs.readdirSync(distDir).filter((name) => /^store-.*\.js$/.test(name))) {
+    const module = await import(pathToFileURL(`${distDir}/${file}`));
+    for (const value of Object.values(module)) {
+      if (typeof value !== "function") continue;
+      if (value.name === "loadCronJobsStore") loadStore = value;
+      if (value.name === "saveCronJobsStore") saveStore = value;
+    }
+    if (loadStore && saveStore) break;
+  }
+  if (loadStore && saveStore) break;
+}
+if (!loadStore || !saveStore) {
+  throw new Error("OpenClaw cron store API not found");
+}
+
+const current = await loadStore(storePath);
+const jobs = current.jobs.filter((job) => !String(job.id || "").startsWith(prefix));
+const ids = new Set(jobs.map((job) => String(job.id || "")));
+for (const job of requested.legacy) {
+  const id = String(job.id || "");
+  if (id && !ids.has(id)) {
+    jobs.push(job);
+    ids.add(id);
+  }
+}
+jobs.push(...requested.managed);
+await saveStore(storePath, { version: 1, jobs });
+"""
 TZ_ALIASES = {
     "CET": "Europe/Vienna",
     "CEST": "Europe/Vienna",
@@ -205,6 +250,7 @@ def install_openclaw_crontab(
     entries = parse_crontab_spec(crontab_spec, default_tz=default_tz)
     now_ms = int(time.time() * 1000)
 
+    legacy_jobs: list[dict[str, Any]] = []
     if cron_jobs.exists() and cron_jobs.stat().st_size > 0:
         try:
             payload = json.loads(cron_jobs.read_text(encoding="utf-8"))
@@ -215,16 +261,17 @@ def install_openclaw_crontab(
     if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
         payload = {"version": 1, "jobs": []}
 
-    kept_jobs = [
+    legacy_jobs = [
         job
         for job in payload.get("jobs", [])
-        if not (isinstance(job, dict) and str(job.get("id", "")).startswith(CRON_JOB_PREFIX))
+        if isinstance(job, dict) and not str(job.get("id", "")).startswith(CRON_JOB_PREFIX)
     ]
+    managed_jobs: list[dict[str, Any]] = []
     labels: list[str] = []
     for tz, hour, minute in entries:
         label = f"{hour:02d}:{minute:02d} {tz}"
         labels.append(label)
-        kept_jobs.append({
+        managed_jobs.append({
             "id": CRON_JOB_PREFIX + _cron_slug(tz, hour, minute),
             "name": CRON_JOB_PREFIX + _cron_slug(tz, hour, minute),
             "enabled": True,
@@ -243,21 +290,14 @@ def install_openclaw_crontab(
         })
 
     cron_dir.mkdir(parents=True, exist_ok=True)
-    cron_jobs.write_text(json.dumps({"version": 1, "jobs": kept_jobs}, indent=2) + "\n", encoding="utf-8")
-    cron_jobs.chmod(0o600)
-
-    if cron_state.exists() and cron_state.stat().st_size > 0:
-        try:
-            state_payload = json.loads(cron_state.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            state_payload = None
-        if isinstance(state_payload, dict) and isinstance(state_payload.get("jobs"), dict):
-            state_payload["jobs"] = {
-                key: value
-                for key, value in state_payload["jobs"].items()
-                if not str(key).startswith(CRON_JOB_PREFIX)
-            }
-            cron_state.write_text(json.dumps(state_payload, indent=2) + "\n", encoding="utf-8")
+    subprocess.run(
+        ["node", "--input-type=module", "-e", OPENCLAW_CRON_STORE_JS, str(cron_jobs), CRON_JOB_PREFIX],
+        input=json.dumps({"legacy": legacy_jobs, "managed": managed_jobs}),
+        text=True,
+        check=True,
+    )
+    cron_jobs.unlink(missing_ok=True)
+    cron_state.unlink(missing_ok=True)
     return labels
 
 
