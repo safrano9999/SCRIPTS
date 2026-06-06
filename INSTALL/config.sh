@@ -10,6 +10,7 @@ fi
 
 PROJECT_NAME="$(basename "$DIR")"
 CONTAINER_NAME="${PROJECT_NAME,,}"
+CONFIG_SHOW="${1:-}"
 
 trim() {
     local value="$1"
@@ -298,7 +299,7 @@ configure_from_example() {
             continue
         fi
         if [ -n "$existing_line" ] && { [ "$required" != "true" ] || [ -n "$existing" ]; }; then
-            echo "    $key= exists"
+            [ "$CONFIG_SHOW" = "--show" ] && echo "    $key=$existing" || echo "    $key= exists"
             continue
         fi
         sed -i "/^${key}=$/d" "$target" 2>/dev/null || true
