@@ -7,7 +7,9 @@ _safrano9999_repo_name() {
 }
 
 _safrano9999_repo_ref() {
-  [ "$1" != "${1%@*}" ] && printf '%s' "${1#*@}"
+  if [ "$1" != "${1%@*}" ]; then
+    printf '%s' "${1#*@}"
+  fi
 }
 
 _safrano9999_clone() {
