@@ -317,7 +317,7 @@ def install_openclaw_crontab(
                 "tz": tz,
                 "staggerMs": 0,
             },
-            "sessionTarget": "main",
+            "sessionTarget": os.environ.get("OPENCLAW_CRON_SESSION_TARGET", "agent:main:main"),
             "wakeMode": "now",
             "payload": {"kind": "systemEvent", "text": message},
             "state": {},
