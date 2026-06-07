@@ -13,17 +13,36 @@ _safrano9999_repo_ref() {
 }
 
 _safrano9999_clone() {
-  local spec="$1" root="$2" repo ref url
+  local spec="$1" root="$2" repo ref url stage lower zip
   repo="$(_safrano9999_repo_name "$spec")"
   ref="$(_safrano9999_repo_ref "$spec")"
-  url="https://github.com/safrano9999/${repo}.git"
+  stage="${SAFRANO9999_STAGE_DIR:-}"
   mkdir -p "$root"
   rm -rf "$root/$repo"
+  if [ -n "$stage" ] && [ -d "$stage/$repo" ]; then
+    cp -a "$stage/$repo" "$root/$repo"
+    rm -rf "$root/$repo/.git"
+    return
+  fi
+  lower="$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')"
+  zip="${stage}/${lower}-latest.zip"
+  if [ -n "$stage" ] && [ -f "$zip" ]; then
+    mkdir -p "$root/$repo"
+    unzip -q "$zip" -d "$root/$repo"
+    rm -rf "$root/$repo/.git"
+    return
+  fi
+  if [ -n "${GH_TOKEN:-}" ]; then
+    url="https://x-access-token:${GH_TOKEN}@github.com/safrano9999/${repo}.git"
+  else
+    url="https://github.com/safrano9999/${repo}.git"
+  fi
   if [ -n "$ref" ]; then
     git clone --depth 1 --branch "$ref" "$url" "$root/$repo"
   else
     git clone --depth 1 "$url" "$root/$repo"
   fi
+  rm -rf "$root/$repo/.git"
 }
 
 _safrano9999_route() {
