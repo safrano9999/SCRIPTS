@@ -205,7 +205,13 @@ def register_openclaw_plugins(
 
     telegram_target = telegram_target.strip()
     if telegram_target:
+        merge_plugin_config(entries.setdefault("dailynews", {}), {
+            "delivery": {"channel": "telegram", "target": telegram_target},
+        })
         merge_plugin_config(entries.setdefault("calendar", {}), {
+            "delivery": {"channel": "telegram", "target": telegram_target},
+        })
+        merge_plugin_config(entries.setdefault("zeroinbox", {}), {
             "delivery": {"channel": "telegram", "target": telegram_target},
         })
         merge_plugin_config(entries.setdefault("kachelmann", {}), {
