@@ -45,24 +45,46 @@ _safrano9999_clone() {
   rm -rf "$root/$repo/.git"
 }
 
-_safrano9999_route() {
-  case "$1" in
-    DAILYNEWS) printf '%s\n' "/plugins/dailynews" ;;
-    CALENDAR) printf '%s\n' "/plugins/calendar/run" ;;
-    ZEROINBOX) printf '%s\n' "/plugins/zeroinbox/run" ;;
-    KACHELMANN) printf '%s\n' "/kachelmann/reminder" ;;
-  esac
+_safrano9999_webhook_curl() {
+  local repo_dir="$1" readme="$1/README.md" manifest="$1/openclaw.plugin.json" index="$1/index.js" curl_cmd path
+  if [ -f "$readme" ]; then
+    curl_cmd="$(awk '
+      tolower($0) ~ /enter this to trigger webhook from inside container/ { want=1; next }
+      want && /^[[:space:]]*curl[[:space:]]/ { sub(/^[[:space:]]*/, ""); print; exit }
+    ' "$readme")"
+    [ -n "$curl_cmd" ] && { printf '%s\n' "$curl_cmd"; return; }
+  fi
+  if [ -f "$manifest" ]; then
+    path="$(python3 - "$manifest" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+props = data.get("configSchema", {}).get("properties", {})
+print(props.get("webhook", {}).get("properties", {}).get("path", {}).get("default", ""))
+PY
+)"
+  fi
+  if [ -z "${path:-}" ] && [ -f "$index" ]; then
+    path="$(python3 - "$index" <<'PY'
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+match = re.search(r"registerHttpRoute\s*\(\s*\{.*?path:\s*[\"']([^\"']+)[\"']", text, re.S)
+print(match.group(1) if match else "")
+PY
+)"
+  fi
+  [ -n "${path:-}" ] && printf 'curl -sS -X POST -H "Authorization: Bearer ${OPENCLAW_GATEWAY_TOKEN}" "http://127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18789}%s"\n' "$path"
 }
 
 _safrano9999_write_webhooks() {
-  local script="${SAFRANO9999_WEBHOOK_SCRIPT:-/usr/local/bin/safrano9999-webhooks}" route repo
+  local root="$1" script="${SAFRANO9999_WEBHOOK_SCRIPT:-/usr/local/bin/safrano9999-webhooks}" cmd repo
+  shift
   mkdir -p "$(dirname "$script")"
   {
     printf '%s\n' '#!/usr/bin/env bash'
     printf '%s\n' 'set -euo pipefail'
     for repo in "$@"; do
-      route="$(_safrano9999_route "$repo" || true)"
-      [ -n "$route" ] && printf 'curl -sS -X POST -H "Authorization: Bearer ${OPENCLAW_GATEWAY_TOKEN}" "http://127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18789}%s"\n' "$route"
+      cmd="$(_safrano9999_webhook_curl "$root/$repo" || true)"
+      [ -n "$cmd" ] && printf '%s\n' "$cmd"
     done
   } > "$script"
   chmod +x "$script"
@@ -125,7 +147,7 @@ safrano9999_OC_plugins() {
     _safrano9999_clone "$spec" "$root"
     repos+=("$(_safrano9999_repo_name "$spec")")
   done
-  _safrano9999_write_webhooks "${repos[@]}"
+  _safrano9999_write_webhooks "$root" "${repos[@]}"
   _safrano9999_write_webhook_runner "$root"
   [ -z "$crontab" ] || printf '%s\n' "$crontab" > "$root/.openclaw-crontab"
 

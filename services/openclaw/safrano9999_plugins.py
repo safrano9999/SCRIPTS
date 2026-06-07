@@ -69,31 +69,52 @@ TZ_ALIASES = {
     "EUROPE/VIENNA": "Europe/Vienna",
 }
 
-PLUGIN_IDS = {
-    "DAILYNEWS": "dailynews",
-    "CALENDAR": "calendar",
-    "ZEROINBOX": "zeroinbox",
-    "KACHELMANN": "kachelmann",
-}
+def _repo_name(spec: str) -> str:
+    return spec.split("@", 1)[0]
 
 
-def _plugin_selection(plugin_names: Iterable[str] | None = None) -> Iterable[tuple[str, str]]:
-    if not plugin_names:
-        yield from PLUGIN_IDS.items()
-        return
-    for name in plugin_names:
-        repo = name.split("@", 1)[0].upper()
-        if repo not in PLUGIN_IDS:
-            raise SystemExit(f"Unknown safrano9999 OpenClaw plugin repo: {name}")
-        yield repo, PLUGIN_IDS[repo]
+def _load_plugin_manifest(repo_path: Path) -> dict[str, Any]:
+    manifest_path = repo_path / "openclaw.plugin.json"
+    if not manifest_path.exists():
+        raise SystemExit(f"Missing OpenClaw plugin manifest: {manifest_path}")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"Invalid OpenClaw plugin manifest {manifest_path}: {error}") from error
+    if not isinstance(manifest, dict):
+        raise SystemExit(f"Invalid OpenClaw plugin manifest {manifest_path}: expected object")
+    return manifest
+
+
+def _manifest_plugin_id(repo_path: Path, manifest: dict[str, Any]) -> str:
+    plugin_id = manifest.get("id")
+    if not isinstance(plugin_id, str) or not plugin_id.strip():
+        raise SystemExit(f"OpenClaw plugin manifest has no id: {repo_path / 'openclaw.plugin.json'}")
+    return plugin_id.strip()
+
+
+def _manifest_config_properties(manifest: dict[str, Any]) -> dict[str, Any]:
+    schema = manifest.get("configSchema")
+    if not isinstance(schema, dict):
+        return {}
+    properties = schema.get("properties")
+    return properties if isinstance(properties, dict) else {}
 
 
 def plugin_dirs(
     plugins_dir: Path,
     plugin_names: Iterable[str] | None = None,
 ) -> Iterable[tuple[str, str, Path]]:
-    for repo, plugin_id in _plugin_selection(plugin_names):
-        yield repo, plugin_id, plugins_dir / repo
+    if plugin_names:
+        candidates = [plugins_dir / _repo_name(name) for name in plugin_names]
+    else:
+        candidates = sorted(
+            path for path in plugins_dir.iterdir()
+            if path.is_dir() and (path / "openclaw.plugin.json").exists()
+        )
+    for repo_path in candidates:
+        manifest = _load_plugin_manifest(repo_path)
+        yield repo_path.name, _manifest_plugin_id(repo_path, manifest), repo_path
 
 
 def install_openclaw_plugins(
@@ -172,8 +193,6 @@ def register_openclaw_plugins(
     config: dict[str, Any],
     plugins_dir: Path,
     *,
-    runtime_env_path: Path | None = None,
-    runtime_conf_path: Path | None = None,
     telegram_target: str = "",
 ) -> list[str]:
     plugins = config.setdefault("plugins", {})
@@ -182,41 +201,22 @@ def register_openclaw_plugins(
     registered: list[str] = []
 
     for _repo, plugin_id, repo_path in plugin_dirs(plugins_dir):
+        manifest = _load_plugin_manifest(repo_path)
         repo_path_text = str(repo_path)
         if repo_path_text not in paths:
             paths.append(repo_path_text)
-        entries.setdefault(plugin_id, {})["enabled"] = True
+        entry = entries.setdefault(plugin_id, {})
+        entry["enabled"] = True
         registered.append(plugin_id)
 
-    if runtime_env_path:
-        merge_plugin_config(entries.setdefault("calendar", {}), {
-            "calenvPath": str(runtime_env_path),
-            "envFile": str(runtime_env_path),
-            "logDir": "/var/log/safrano9999/calendar",
-        })
-        merge_plugin_config(entries.setdefault("kachelmann", {}), {
-            "envFile": str(runtime_env_path),
-        })
-    if runtime_conf_path:
-        merge_plugin_config(entries.setdefault("zeroinbox", {}), {
-            "configPath": str(runtime_conf_path),
-            "envFile": str(runtime_env_path or runtime_conf_path),
-        })
-
-    telegram_target = telegram_target.strip()
-    if telegram_target:
-        merge_plugin_config(entries.setdefault("dailynews", {}), {
-            "delivery": {"channel": "telegram", "target": telegram_target},
-        })
-        merge_plugin_config(entries.setdefault("calendar", {}), {
-            "delivery": {"channel": "telegram", "target": telegram_target},
-        })
-        merge_plugin_config(entries.setdefault("zeroinbox", {}), {
-            "delivery": {"channel": "telegram", "target": telegram_target},
-        })
-        merge_plugin_config(entries.setdefault("kachelmann", {}), {
-            "statusDelivery": {"channel": "telegram", "target": telegram_target},
-        })
+        target = telegram_target.strip()
+        if target:
+            delivery = {"channel": "telegram", "target": target}
+            properties = _manifest_config_properties(manifest)
+            if "delivery" in properties:
+                merge_plugin_config(entry, {"delivery": dict(delivery)})
+            if "statusDelivery" in properties:
+                merge_plugin_config(entry, {"statusDelivery": dict(delivery)})
     webhook_runner = plugins_dir / "WEBHOOK-RUNNER"
     if (webhook_runner / "openclaw.plugin.json").exists():
         runner_path = str(webhook_runner)
