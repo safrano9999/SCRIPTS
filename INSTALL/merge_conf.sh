@@ -18,7 +18,7 @@ fi
 
 if [ "${#files[@]}" -eq 0 ]; then
     : > "$output"
-    echo "  ! Keine $config_name Quellen gefunden"
+    echo "  ! No $config_name sources found"
     exit 0
 fi
 
@@ -52,4 +52,4 @@ FNR == 1 {
 }
 ' "${files[@]}" > "$output"
 
-echo "  Merged $config_name (${#files[@]} Quellen) -> ${output#"$dir"/}"
+echo "  Merged $config_name (${#files[@]} sources) -> ${output#"$dir"/}"
