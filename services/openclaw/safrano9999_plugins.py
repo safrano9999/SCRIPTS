@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared installer/registration helpers for the four safrano9999 plugins."""
+"""Shared installer/registration helpers for safrano9999 OpenClaw plugins."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable
 
 
 DEFAULT_CRONTAB_SPEC = "CET 07:00,CET 12:00,CET 15:30,CET 19:00"
-DEFAULT_CRON_MESSAGE = "/dailynews\n/calendar\n/zeroinbox\n/kachelmann status"
+DEFAULT_CRON_MESSAGE = "__safrano9999_webhooks__"
 CRON_JOB_PREFIX = "safrano9999-routines-"
 OPENCLAW_CRON_STORE_JS = r"""
 import fs from "node:fs";
@@ -77,8 +77,22 @@ PLUGIN_IDS = {
 }
 
 
-def plugin_dirs(plugins_dir: Path) -> Iterable[tuple[str, str, Path]]:
-    for repo, plugin_id in PLUGIN_IDS.items():
+def _plugin_selection(plugin_names: Iterable[str] | None = None) -> Iterable[tuple[str, str]]:
+    if not plugin_names:
+        yield from PLUGIN_IDS.items()
+        return
+    for name in plugin_names:
+        repo = name.split("@", 1)[0].upper()
+        if repo not in PLUGIN_IDS:
+            raise SystemExit(f"Unknown safrano9999 OpenClaw plugin repo: {name}")
+        yield repo, PLUGIN_IDS[repo]
+
+
+def plugin_dirs(
+    plugins_dir: Path,
+    plugin_names: Iterable[str] | None = None,
+) -> Iterable[tuple[str, str, Path]]:
+    for repo, plugin_id in _plugin_selection(plugin_names):
         yield repo, plugin_id, plugins_dir / repo
 
 
@@ -87,11 +101,12 @@ def install_openclaw_plugins(
     openclaw_cmd: Callable[..., list[str]],
     *,
     links: bool = False,
+    plugin_names: Iterable[str] | None = None,
 ) -> list[str]:
-    """Install all four plugins from already-staged directories."""
+    """Install staged plugin directories."""
 
     installed: list[str] = []
-    for repo, plugin_id, repo_path in plugin_dirs(plugins_dir):
+    for repo, plugin_id, repo_path in plugin_dirs(plugins_dir, plugin_names):
         if not (repo_path / "openclaw.plugin.json").exists():
             raise SystemExit(f"Missing OpenClaw plugin repo: {repo_path}")
 
@@ -104,11 +119,16 @@ def install_openclaw_plugins(
     return installed
 
 
-def setup_plugin_python(plugins_dir: Path, *, fallback_venv: bool = False) -> list[str]:
-    """Build plugin .venv directories for all staged plugins."""
+def setup_plugin_python(
+    plugins_dir: Path,
+    *,
+    fallback_venv: bool = False,
+    plugin_names: Iterable[str] | None = None,
+) -> list[str]:
+    """Build plugin .venv directories for staged plugins."""
 
     prepared: list[str] = []
-    for repo, plugin_id, repo_path in plugin_dirs(plugins_dir):
+    for repo, plugin_id, repo_path in plugin_dirs(plugins_dir, plugin_names):
         setup_script = repo_path / "scripts" / "setup-python.sh"
         if setup_script.exists():
             setup_script.chmod(setup_script.stat().st_mode | 0o111)
@@ -185,12 +205,26 @@ def register_openclaw_plugins(
 
     telegram_target = telegram_target.strip()
     if telegram_target:
+        merge_plugin_config(entries.setdefault("dailynews", {}), {
+            "delivery": {"channel": "telegram", "target": telegram_target},
+        })
         merge_plugin_config(entries.setdefault("calendar", {}), {
+            "delivery": {"channel": "telegram", "target": telegram_target},
+        })
+        merge_plugin_config(entries.setdefault("zeroinbox", {}), {
             "delivery": {"channel": "telegram", "target": telegram_target},
         })
         merge_plugin_config(entries.setdefault("kachelmann", {}), {
             "statusDelivery": {"channel": "telegram", "target": telegram_target},
         })
+    webhook_runner = plugins_dir / "WEBHOOK-RUNNER"
+    if (webhook_runner / "openclaw.plugin.json").exists():
+        runner_path = str(webhook_runner)
+        if runner_path not in paths:
+            paths.append(runner_path)
+        runner_entry = entries.setdefault("safrano9999-webhooks", {})
+        runner_entry["enabled"] = True
+        runner_entry["hooks"] = {"allowConversationAccess": True}
     return registered
 
 
@@ -320,6 +354,7 @@ def _run_crontab(args: argparse.Namespace) -> None:
         Path(args.config_dir),
         _crontab_spec_from_values(args.crontab),
         default_tz=args.tz,
+        message=args.message,
     )
     print(f"OpenClaw safrano9999 cronjobs written: {', '.join(labels)}")
 
@@ -329,6 +364,7 @@ def main() -> None:
         compat_parser = argparse.ArgumentParser(description="Install safrano9999 OpenClaw crontab jobs.")
         compat_parser.add_argument("--config-dir", default=os.environ.get("OPENCLAW_CONFIG_DIR", "/root/.openclaw"))
         compat_parser.add_argument("--tz", default=os.environ.get("SAFRANO9999_ROUTINES_TZ", "Europe/Vienna"))
+        compat_parser.add_argument("--message", default=DEFAULT_CRON_MESSAGE)
         compat_parser.add_argument("crontab", nargs="*")
         args = compat_parser.parse_args(sys.argv[2:])
         _run_crontab(args)
@@ -340,25 +376,37 @@ def main() -> None:
     install_parser = subparsers.add_parser("install")
     install_parser.add_argument("--plugins-dir", required=True)
     install_parser.add_argument("--links", action="store_true", help="Install staged repo directories with OpenClaw --link.")
+    install_parser.add_argument("--plugins", nargs="+")
 
     python_parser = subparsers.add_parser("setup-python")
     python_parser.add_argument("--plugins-dir", required=True)
     python_parser.add_argument("--fallback-venv", action="store_true")
+    python_parser.add_argument("--plugins", nargs="+")
 
     cron_parser = subparsers.add_parser("crontab")
     cron_parser.add_argument("--config-dir", default=os.environ.get("OPENCLAW_CONFIG_DIR", "/root/.openclaw"))
     cron_parser.add_argument("--tz", default=os.environ.get("SAFRANO9999_ROUTINES_TZ", "Europe/Vienna"))
     cron_parser.add_argument("--crontab", nargs="+")
+    cron_parser.add_argument("--message", default=DEFAULT_CRON_MESSAGE)
 
     args = parser.parse_args()
 
     if args.command == "install":
         plugins_dir = Path(args.plugins_dir)
-        installed = install_openclaw_plugins(plugins_dir, _openclaw_cmd, links=args.links)
+        installed = install_openclaw_plugins(
+            plugins_dir,
+            _openclaw_cmd,
+            links=args.links,
+            plugin_names=args.plugins,
+        )
         print(f"OpenClaw safrano9999 plugins installed: {', '.join(installed)}")
     elif args.command == "setup-python":
         plugins_dir = Path(args.plugins_dir)
-        prepared = setup_plugin_python(plugins_dir, fallback_venv=args.fallback_venv)
+        prepared = setup_plugin_python(
+            plugins_dir,
+            fallback_venv=args.fallback_venv,
+            plugin_names=args.plugins,
+        )
         print(f"OpenClaw safrano9999 plugin Python prepared: {', '.join(prepared)}")
     elif args.command == "crontab":
         _run_crontab(args)
