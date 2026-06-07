@@ -48,10 +48,7 @@ _safrano9999_clone() {
 _safrano9999_webhook_curl() {
   local repo_dir="$1" readme="$1/README.md" manifest="$1/openclaw.plugin.json" index="$1/index.js" curl_cmd path
   if [ -f "$readme" ]; then
-    curl_cmd="$(awk '
-      tolower($0) ~ /enter this to trigger webhook from inside container/ { want=1; next }
-      want && /^[[:space:]]*curl[[:space:]]/ { sub(/^[[:space:]]*/, ""); print; exit }
-    ' "$readme")"
+    curl_cmd="$(_safrano9999_readme_curl "$repo_dir" || true)"
     [ -n "$curl_cmd" ] && { printf '%s\n' "$curl_cmd"; return; }
   fi
   if [ -f "$manifest" ]; then
@@ -75,6 +72,15 @@ PY
   [ -n "${path:-}" ] && printf 'curl -sS -X POST -H "Authorization: Bearer ${OPENCLAW_GATEWAY_TOKEN}" "http://127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18789}%s"\n' "$path"
 }
 
+_safrano9999_readme_curl() {
+  local readme="$1/README.md"
+  [ -f "$readme" ] || return 1
+  awk '
+    tolower($0) ~ /enter this to trigger webhook from inside container/ { want=1; next }
+    want && /^[[:space:]]*curl[[:space:]]/ { sub(/^[[:space:]]*/, ""); print; exit }
+  ' "$readme"
+}
+
 _safrano9999_write_webhooks() {
   local root="$1" script="${SAFRANO9999_WEBHOOK_SCRIPT:-/usr/local/bin/safrano9999-webhooks}" cmd repo
   shift
@@ -85,6 +91,22 @@ _safrano9999_write_webhooks() {
     for repo in "$@"; do
       cmd="$(_safrano9999_webhook_curl "$root/$repo" || true)"
       [ -n "$cmd" ] && printf '%s\n' "$cmd"
+    done
+  } > "$script"
+  chmod +x "$script"
+}
+
+_safrano9999_write_fullrun() {
+  local root="$1" script="${SAFRANO9999_FULLRUN_SCRIPT:-/usr/local/bin/safrano9999-fullrun}" cmd repo
+  shift
+  mkdir -p "$(dirname "$script")"
+  {
+    printf '%s\n' '#!/usr/bin/env bash'
+    printf '%s\n' 'set -euo pipefail'
+    for repo in "$@"; do
+      cmd="$(_safrano9999_readme_curl "$root/$repo")"
+      [ -n "$cmd" ] || { echo "missing README webhook curl: $repo" >&2; return 1; }
+      printf '%s\n' "$cmd"
     done
   } > "$script"
   chmod +x "$script"
@@ -131,11 +153,12 @@ safrano9999_standalone() {
 }
 
 safrano9999_OC_plugins() {
-  local root="${OPENCLAW_PLUGINS_DIR:-${SAFRANO9999_DIR:-/opt/safrano9999}}" link=false crontab="" spec
+  local root="${OPENCLAW_PLUGINS_DIR:-${SAFRANO9999_DIR:-/opt/safrano9999}}" link=false fullrun=false crontab="" spec
   local -a specs=() repos=() install_args setup_args
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --link) link=true; shift ;;
+      --fullrun) fullrun=true; shift ;;
       --crontab) crontab="${2:-}"; shift 2 ;;
       --) shift; break ;;
       *) specs+=("$1"); shift ;;
@@ -148,6 +171,7 @@ safrano9999_OC_plugins() {
     repos+=("$(_safrano9999_repo_name "$spec")")
   done
   _safrano9999_write_webhooks "$root" "${repos[@]}"
+  [ "$fullrun" = false ] || _safrano9999_write_fullrun "$root" "${repos[@]}"
   _safrano9999_write_webhook_runner "$root"
   [ -z "$crontab" ] || printf '%s\n' "$crontab" > "$root/.openclaw-crontab"
 
