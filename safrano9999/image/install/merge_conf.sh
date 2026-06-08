@@ -29,6 +29,21 @@ function flush_pending() {
 FNR == 1 {
     flush_pending()
 }
+/^[[:space:]]*#[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*_VOLUMES=/ {
+    line = $0
+    sub(/^[[:space:]]*#[[:space:]]*/, "", line)
+    sub(/^[[:space:]]*export[[:space:]]+/, "", line)
+    key = line
+    sub(/=.*/, "", key)
+    if (!(key in seen)) {
+        seen[key] = 1
+        if (pending != "") printf "%s", pending
+        print "# " line
+        print ""
+    }
+    flush_pending()
+    next
+}
 /^[[:space:]]*($|#)/ {
     pending = pending $0 "\n"
     next
