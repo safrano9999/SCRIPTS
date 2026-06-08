@@ -1,5 +1,15 @@
 # Here are some useful scripts, mostly in Bash
 
+## Safrano9999 shared layout
+
+- `safrano9999/config.sh`: shared config SOT for baremetal repos and containers.
+- `safrano9999/python_header.py`: shared Python env loader for baremetal repos and containers.
+- `safrano9999/image/`: shared setup and image-build helpers.
+- `safrano9999/image/install/`: merge helpers.
+- `safrano9999/image/services/`: service files and service helpers copied into images.
+- `safrano9999/container/`: small runtime scripts copied 1:1 into containers.
+- `safrano9999/container/openclaw/`: OpenClaw runtime scripts such as cron registration.
+
 ## note – Terminal to MD-File in One Command
 
 > Looking for a solution to remember important commands you type in the console or codeblocks?

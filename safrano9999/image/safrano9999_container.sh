@@ -129,7 +129,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 
 const execFileAsync = promisify(execFile);
 const cronToken = "__safrano9999_webhooks__";
-const script = process.env.SAFRANO9999_WEBHOOK_SCRIPT || "/usr/local/bin/safrano9999-webhooks";
+const script = process.env.SAFRANO9999_FULLRUN_SCRIPT || process.env.SAFRANO9999_WEBHOOK_SCRIPT || "/usr/local/bin/safrano9999-fullrun";
 
 export default definePluginEntry({
   id: "safrano9999-webhooks",

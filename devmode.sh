@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # devmode.sh — Restore dev-mode symlinks across all sibling repos.
 #
-# Walks every sibling of SCRIPTS/. For each shared file in SCRIPTS/,
+# Walks every sibling of SCRIPTS/. For each shared file in SCRIPTS/safrano9999/,
 # if that filename also exists (as file or symlink) anywhere in the
-# sibling repo, replace it with a relative symlink back to SCRIPTS/.
+# sibling repo, replace it with a relative symlink back to SCRIPTS/safrano9999/.
 #
 # Run once:
 #     bash ~/saf/SCRIPTS/devmode.sh
@@ -11,6 +11,7 @@
 set -euo pipefail
 
 SCRIPTS_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
+SHARED_DIR="$SCRIPTS_DIR/safrano9999"
 WORKSPACE="$(dirname "$SCRIPTS_DIR")"
 
 # Files in SCRIPTS that should be distributed as symlinks into sibling repos
@@ -31,7 +32,7 @@ for repo in "$WORKSPACE"/*/; do
     echo "--- $repo_name ---"
 
     for shared in "${SHARED_FILES[@]}"; do
-        source_file="$SCRIPTS_DIR/$shared"
+        source_file="$(find "$SHARED_DIR" -type f -name "$shared" -print -quit)"
         [[ ! -f "$source_file" ]] && continue
 
         # Find every occurrence of this filename in the repo (excl. .git)
