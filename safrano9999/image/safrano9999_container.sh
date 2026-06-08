@@ -104,8 +104,8 @@ _safrano9999_write_fullrun() {
     printf '%s\n' '#!/usr/bin/env bash'
     printf '%s\n' 'set -euo pipefail'
     for repo in "$@"; do
-      cmd="$(_safrano9999_readme_curl "$root/$repo")"
-      [ -n "$cmd" ] || { echo "missing README webhook curl: $repo" >&2; return 1; }
+      cmd="$(_safrano9999_webhook_curl "$root/$repo" || true)"
+      [ -n "$cmd" ] || { echo "missing webhook curl: $repo" >&2; return 1; }
       printf '%s\n' "$cmd"
     done
   } > "$script"
