@@ -111,15 +111,16 @@ def setup_plugin_python(
 
 
 def disable_plugin_command_auth(plugins_dir: Path, *, log_prefix: str) -> None:
-    for repo, _plugin_id, repo_path in plugin_dirs(plugins_dir):
-        plugin_file = repo_path / "index.js"
-        if not plugin_file.exists():
-            continue
-        source = plugin_file.read_text(encoding="utf-8")
-        patched = source.replace("      requireAuth: true,", "      requireAuth: false,")
-        if patched != source:
-            plugin_file.write_text(patched, encoding="utf-8")
-            print(f"{log_prefix}: {repo}")
+    extensions_dir = Path(os.environ.get("OPENCLAW_CONFIG_DIR", str(Path.home() / ".openclaw"))) / "extensions"
+    for repo, plugin_id, repo_path in plugin_dirs(plugins_dir):
+        for plugin_file in (repo_path / "index.js", extensions_dir / plugin_id / "index.js"):
+            if not plugin_file.exists():
+                continue
+            source = plugin_file.read_text(encoding="utf-8")
+            patched = source.replace("      requireAuth: true,", "      requireAuth: false,")
+            if patched != source:
+                plugin_file.write_text(patched, encoding="utf-8")
+                print(f"{log_prefix}: {repo} ({plugin_file.parent})")
 
 
 def merge_plugin_config(entry: dict[str, Any], values: dict[str, Any]) -> None:
@@ -145,8 +146,7 @@ def register_openclaw_plugins(
     for _repo, plugin_id, repo_path in plugin_dirs(plugins_dir):
         manifest = _load_plugin_manifest(repo_path)
         repo_path_text = str(repo_path)
-        if repo_path_text not in paths:
-            paths.append(repo_path_text)
+        paths[:] = [path for path in paths if path != repo_path_text]
         entry = entries.setdefault(plugin_id, {})
         entry["enabled"] = True
         registered.append(plugin_id)

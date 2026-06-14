@@ -187,7 +187,6 @@ def configure_telegram_main(
     token_ref = env_ref("TELEGRAMTOKEN_OPENCLAW")
     telegram = config.setdefault("channels", {}).setdefault("telegram", {})
     telegram["enabled"] = True
-    telegram["botToken"] = token_ref
     telegram["dmPolicy"] = "open"
     telegram["allowFrom"] = ["*"]
     telegram["groupPolicy"] = "open"
@@ -196,6 +195,7 @@ def configure_telegram_main(
     telegram["network"] = {"autoSelectFamily": False, "dnsResultOrder": "ipv4first"}
 
     if include_account:
+        telegram.pop("botToken", None)
         telegram["capabilities"] = {"inlineButtons": "dm"}
         telegram["commands"] = {"native": False, "nativeSkills": False}
         telegram["streaming"] = {"mode": "off"}
@@ -218,6 +218,8 @@ def configure_telegram_main(
             }
         }
         telegram["defaultAccount"] = "default"
+    else:
+        telegram["botToken"] = token_ref
 
     if include_binding:
         bindings = config.setdefault("bindings", [])
