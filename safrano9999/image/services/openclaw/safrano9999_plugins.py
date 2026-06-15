@@ -151,10 +151,13 @@ def register_openclaw_plugins(
         entry["enabled"] = True
         registered.append(plugin_id)
 
+        properties = _manifest_config_properties(manifest)
+        if "configPath" in properties:
+            merge_plugin_config(entry, {"configPath": str(repo_path / "config.conf")})
+
         target = telegram_target.strip()
         if target:
             delivery = {"channel": "telegram", "target": target}
-            properties = _manifest_config_properties(manifest)
             if "delivery" in properties:
                 merge_plugin_config(entry, {"delivery": dict(delivery)})
             if "statusDelivery" in properties:

@@ -35,8 +35,7 @@ CONTAINER_ONLY_ALIAS_BLOCKS = {
       requireAuth: false,
       handler: async (ctx) => {
         const raw = readString(ctx?.args) ?? "";
-        const payload = await runZeroinbox(api, { raw });
-        return { text: payload.text ?? "ZEROINBOX done." };
+        return runZeroinboxCommand(api, raw);
       },
     });
 """,
