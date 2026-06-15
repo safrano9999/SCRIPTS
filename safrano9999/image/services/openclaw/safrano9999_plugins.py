@@ -153,7 +153,11 @@ def register_openclaw_plugins(
 
         properties = _manifest_config_properties(manifest)
         if "configPath" in properties:
-            merge_plugin_config(entry, {"configPath": str(repo_path / "config.conf")})
+            for config_name in ("config.conf", "config.json"):
+                config_path = repo_path / config_name
+                if config_path.exists():
+                    merge_plugin_config(entry, {"configPath": str(config_path)})
+                    break
 
         target = telegram_target.strip()
         if target:
