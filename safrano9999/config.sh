@@ -510,6 +510,8 @@ generate_container_files() {
         fi
         printf '    # Container image from config or existing generated file\n'
         printf '    image: %s\n' "$image"
+        printf '    labels:\n'
+        printf '      - "io.containers.autoupdate=registry"\n'
         printf '    container_name: %s\n' "$CONTAINER_NAME"
         printf '    hostname: %s\n' "$CONTAINER_NAME"
         if [ "${#ports[@]}" -gt 0 ]; then
@@ -576,7 +578,7 @@ generate_container_files() {
         for item in "${caps[@]}"; do printf 'AddCapability=%s\n' "$item"; done
         [ "${#devices[@]}" -gt 0 ] && printf '# Device mappings from *_DEVICES in config.conf\n'
         for item in "${devices[@]}"; do printf 'AddDevice=%s\n' "$item"; done
-        printf '#AutoUpdate=registry\n\n'
+        printf 'AutoUpdate=registry\n\n'
         printf '[Service]\n'
         printf 'Restart=always\n'
         printf 'TimeoutStartSec=30\n\n'
