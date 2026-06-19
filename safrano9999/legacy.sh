@@ -83,7 +83,7 @@ rewrite_file() {
 }
 
 declare -A EXPECTED LEGACY
-declare -a files labels all_entries keys_env keys_conf
+declare -a all_entries=() keys_env=() keys_conf=()
 
 find_legacy "$ROOT/.env" "$ROOT/env.example"
 for key in "${!LEGACY[@]}"; do keys_env+=("$key"); all_entries+=(".env:$key"); done
