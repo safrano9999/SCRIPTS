@@ -102,7 +102,7 @@ def configure_gateway(
     if allow_insecure_auth:
         control_ui["allowInsecureAuth"] = True
 
-    host = os.environ.get("HOST", "127.0.0.1").strip() or "127.0.0.1"
+    host = os.environ.get("FASTAPI_HOST", "127.0.0.1").strip() or "127.0.0.1"
     publish_port = os.environ.get("OPENCLAW_GATEWAY_PUBLISH_PORT", "").strip()
     origins = list(control_ui.get("allowedOrigins") or [])
     wanted = [origin(host, port), origin("127.0.0.1", port), origin("localhost", port)]
