@@ -208,16 +208,6 @@ add_repo_sot_file_mounts() {
     done < "$DIR/.gitignore"
 }
 
-add_repo_provider_file_mounts() {
-    local file rel
-
-    for file in "$DIR/provider.conf" "$DIR/provider.json" "$DIR"/*-provider.conf "$DIR"/*-provider.json; do
-        [ -f "$file" ] || continue
-        rel="$(basename "$file")"
-        add_repo_file_bind_mount "$rel"
-    done
-}
-
 sqlite_backend_enabled() {
     local file line stripped entry key value
 
@@ -593,7 +583,6 @@ generate_container_files() {
         add_repo_bind_mount "STATE"
     fi
     add_repo_sot_file_mounts
-    add_repo_provider_file_mounts
 
     if [ "${#ports[@]}" -eq 0 ] && [ -n "$first_port" ]; then
         add_unique "${host}:${first_port}:${first_port}" ports
