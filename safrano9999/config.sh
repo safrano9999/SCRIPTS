@@ -149,6 +149,24 @@ add_unique() {
     target+=("$value")
 }
 
+normalize_volume_item() {
+    local item="$1"
+    local source rest normalized_source
+
+    if [[ "$item" != *:* ]]; then
+        printf '%s\n' "$item"
+        return 0
+    fi
+
+    source="${item%%:*}"
+    rest="${item#*:}"
+    normalized_source="$source"
+    if [[ "$source" == "." || "$source" == ./* || "$source" == ../* || ( "$source" != /* && "$source" == */* ) ]]; then
+        normalized_source="$(cd "$DIR" && realpath -m -- "$source")"
+    fi
+    printf '%s:%s\n' "$normalized_source" "$rest"
+}
+
 rewrite_config_with_comments() {
     local example="$1"
     local target="$2"
@@ -479,8 +497,9 @@ generate_container_files() {
                 IFS=',' read -ra items <<< "$value"
                 for item in "${items[@]}"; do
                     item="$(trim "$item")"
-                    add_unique "$item" volumes
                     source="${item%%:*}"
+                    item="$(normalize_volume_item "$item")"
+                    add_unique "$item" volumes
                     if [[ "$source" != /* && "$source" != .* && "$source" != *"/"* ]]; then
                         add_unique "$source" named_volumes
                     fi
