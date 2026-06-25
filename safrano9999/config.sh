@@ -183,6 +183,31 @@ add_repo_bind_mount() {
     add_unique "${source}:${target}:Z" volumes
 }
 
+add_repo_file_bind_mount() {
+    local rel="$1"
+    local source target
+
+    rel="$(trim "$rel")"
+    [ -n "$rel" ] || return 0
+    [[ "$rel" == /* || "$rel" == ../* || "$rel" == */* ]] && return 0
+
+    source="$(cd "$DIR" && realpath -m -- "$rel")"
+    touch "$source"
+    target="/opt/safrano9999/$PROJECT_NAME/$rel"
+    add_unique "${source}:${target}:Z" volumes
+}
+
+add_repo_sot_file_mounts() {
+    local line entry
+
+    [ -f "$DIR/.gitignore" ] || return 0
+    while IFS= read -r line || [ -n "$line" ]; do
+        entry="$(trim "${line%%#*}")"
+        [[ "$entry" == *_SOT.md ]] || continue
+        add_repo_file_bind_mount "$entry"
+    done < "$DIR/.gitignore"
+}
+
 sqlite_backend_enabled() {
     local file line stripped entry key value
 
@@ -557,6 +582,7 @@ generate_container_files() {
     if [ "$sqlite_backend_seen" -eq 1 ] || sqlite_backend_enabled; then
         add_repo_bind_mount "STATE"
     fi
+    add_repo_sot_file_mounts
 
     if [ "${#ports[@]}" -eq 0 ] && [ -n "$first_port" ]; then
         add_unique "${host}:${first_port}:${first_port}" ports
