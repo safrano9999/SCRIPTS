@@ -5,12 +5,15 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
-import urllib.error
-import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from python_header import OpenAIV1Provider
 
 
 DISCOVERY_TIMEOUT_SECONDS = 5
@@ -241,108 +244,159 @@ def configure_telegram_main(
     return True
 
 
-def litellm_base_url() -> str:
-    raw_url = os.environ.get("LITELLM_URL", "").strip()
-    port = os.environ.get("LITELLM_PORT", "").strip()
-    if not raw_url or not port:
-        return ""
-    base = raw_url.rstrip("/")
-    if base.endswith("/v1"):
-        base = base[:-3].rstrip("/")
-    return f"{base}:{port}/v1"
+@dataclass(frozen=True)
+class OpenAIV1RuntimeProvider:
+    config: "OpenAIV1Provider"
+    provider_id: str
+    key_env: str
+    models: tuple[str, ...]
 
 
-def discover_litellm_models(fallback_model: str) -> tuple[list[str], bool]:
-    base_url = litellm_base_url()
-    api_key = os.environ.get("LITELLM_API_KEY", "").strip()
-    models = [fallback_model]
-    if not base_url or not api_key:
-        return models, False
-
-    request = urllib.request.Request(
-        f"{base_url}/models",
-        headers={"Authorization": f"Bearer {api_key}"},
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=DISCOVERY_TIMEOUT_SECONDS) as response:
-            payload: Any = json.loads(response.read().decode("utf-8"))
-    except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
-        print(f"OpenClaw LiteLLM model discovery skipped: {exc}")
-        return models, False
-
-    discovered: list[str] = []
-    for item in payload.get("data", []) if isinstance(payload, dict) else []:
-        model_id = item.get("id") if isinstance(item, dict) else item
-        if not isinstance(model_id, str):
-            continue
-        model_id = model_id.strip()
-        if model_id.startswith("litellm/"):
-            model_id = model_id.removeprefix("litellm/")
-        if model_id and model_id not in discovered:
-            discovered.append(model_id)
-
-    for model_id in discovered:
-        if model_id not in models:
-            models.append(model_id)
-    return models, bool(discovered)
+def _indexed_openai_v1_env_name(field: str, index: int) -> str:
+    if index == 1:
+        return f"OPENAI_V1_{field}"
+    for suffix in (f"_{index}", f"_{index:02d}"):
+        name = f"OPENAI_V1_{field}{suffix}"
+        if name in os.environ:
+            return name
+    pattern = re.compile(rf"^OPENAI_V1_{re.escape(field)}_(\d+)$")
+    for name in sorted(os.environ):
+        match = pattern.match(name)
+        if match and int(match.group(1)) == index:
+            return name
+    return f"OPENAI_V1_{field}_{index}"
 
 
-def configure_litellm_provider(
+def _provider_id(provider: "OpenAIV1Provider", used: set[str]) -> str:
+    raw = provider.provider or provider.key
+    candidate = re.sub(r"[^a-z0-9._-]+", "_", raw.lower()).strip("._-")
+    candidate = candidate or provider.key
+    if candidate in used:
+        candidate = f"{candidate}_{provider.index}"
+    used.add(candidate)
+    return candidate
+
+
+def discover_openai_v1_runtime_providers(
+    *,
+    consumer: str,
+    timeout: float = DISCOVERY_TIMEOUT_SECONDS,
+) -> list[OpenAIV1RuntimeProvider]:
+    from python_header import openai_v1_models, openai_v1_providers
+
+    configured = openai_v1_providers()
+    if not configured:
+        raise SystemExit("OPENAI_V1_URL, OPENAI_V1_PORT, and OPENAI_V1_KEY must be configured")
+
+    runtime: list[OpenAIV1RuntimeProvider] = []
+    used_ids: set[str] = set()
+    for provider in configured:
+        key_env = _indexed_openai_v1_env_name("KEY", provider.index)
+        if not provider.api_key:
+            raise SystemExit(f"{key_env} must not be empty")
+        provider_id = _provider_id(provider, used_ids)
+        try:
+            models = tuple(openai_v1_models(provider, timeout=timeout))
+        except Exception as exc:
+            print(f"{consumer} model discovery skipped for {provider_id}: {exc}")
+            models = ()
+        runtime.append(
+            OpenAIV1RuntimeProvider(
+                config=provider,
+                provider_id=provider_id,
+                key_env=key_env,
+                models=models,
+            )
+        )
+    return runtime
+
+
+def select_openai_v1_model(
+    providers: list[OpenAIV1RuntimeProvider],
+    configured_model: str,
+) -> tuple[OpenAIV1RuntimeProvider, str]:
+    model = configured_model.strip()
+    if not model:
+        raise SystemExit("OpenAI v1 default model must not be empty")
+
+    for provider in providers:
+        aliases = {provider.provider_id}
+        if provider.config.provider:
+            aliases.add(provider.config.provider.strip().lower())
+        for alias in aliases:
+            prefix = f"{alias}/"
+            if model.lower().startswith(prefix):
+                selected_model = model[len(prefix):].strip()
+                if selected_model:
+                    return provider, selected_model
+
+    for provider in providers:
+        if model in provider.models:
+            return provider, model
+    return providers[0], model
+
+
+def configure_openai_v1_providers(
     config: dict[str, Any],
     *,
     default_model: str,
     default_context_window: int = 128000,
     default_max_tokens: int = 8192,
 ) -> dict[str, Any]:
-    model = os.environ.get("OPENCLAW_LITELLM_MODEL", default_model).strip()
-    if model.startswith("litellm/"):
-        model = model.removeprefix("litellm/")
-    if not model:
-        raise SystemExit("OPENCLAW_LITELLM_MODEL must not be empty")
-
-    discovered_models, discovery_ok = discover_litellm_models(model)
-    model_name = os.environ.get("OPENCLAW_LITELLM_MODEL_NAME", model).strip() or model
-    context_window = int_env("OPENCLAW_LITELLM_CONTEXT_WINDOW", default_context_window)
-    max_tokens = int_env("OPENCLAW_LITELLM_MAX_TOKENS", default_max_tokens)
+    configured_model = os.environ.get("OPENCLAW_OPENAI_V1_DEFAULT_LLM", default_model).strip()
+    providers = discover_openai_v1_runtime_providers(consumer="OpenClaw")
+    selected_provider, selected_model = select_openai_v1_model(providers, configured_model)
 
     models_config = config.setdefault("models", {})
     models_config["mode"] = "merge"
-    provider = models_config.setdefault("providers", {}).setdefault("litellm", {})
-    provider["baseUrl"] = litellm_base_url()
-    provider["api"] = "openai-completions"
-    provider["apiKey"] = env_ref("LITELLM_API_KEY")
-    provider["request"] = {"allowPrivateNetwork": True}
+    provider_configs = models_config.setdefault("providers", {})
+    written_count = 0
+    discovered_count = 0
 
-    merged: dict[str, dict[str, Any]] = {}
-    for item in provider.get("models", []):
-        if not isinstance(item, dict):
-            continue
-        model_id = item.get("id")
-        if isinstance(model_id, str) and model_id:
-            merged[model_id] = item
+    for runtime in providers:
+        provider = provider_configs.setdefault(runtime.provider_id, {})
+        provider["baseUrl"] = runtime.config.base_url
+        provider["api"] = "openai-completions"
+        provider["apiKey"] = env_ref(runtime.key_env)
+        provider["request"] = {"allowPrivateNetwork": True}
 
-    for model_id in discovered_models:
-        entry = {
-            "id": model_id,
-            "name": model_name if model_id == model else model_id,
-            "reasoning": True,
-            "input": ["text"],
-            "contextWindow": context_window,
-            "maxTokens": max_tokens,
-        }
-        entry.update(merged.get(model_id, {}))
-        entry["id"] = model_id
-        merged[model_id] = entry
-    provider["models"] = list(merged.values())
+        merged: dict[str, dict[str, Any]] = {}
+        for item in provider.get("models", []):
+            if not isinstance(item, dict):
+                continue
+            model_id = item.get("id")
+            if isinstance(model_id, str) and model_id:
+                merged[model_id] = item
 
-    full_model = f"litellm/{model}"
+        model_ids = list(runtime.models)
+        discovered_count += len(model_ids)
+        if runtime == selected_provider and selected_model not in model_ids:
+            model_ids.insert(0, selected_model)
+
+        for model_id in model_ids:
+            entry = {
+                "id": model_id,
+                "name": model_id,
+                "reasoning": True,
+                "input": ["text"],
+                "contextWindow": default_context_window,
+                "maxTokens": default_max_tokens,
+            }
+            entry.update(merged.get(model_id, {}))
+            entry["id"] = model_id
+            merged[model_id] = entry
+        provider["models"] = list(merged.values())
+        written_count += len(provider["models"])
+
+    full_model = f"{selected_provider.provider_id}/{selected_model}"
     config.setdefault("agents", {}).setdefault("defaults", {}).setdefault("model", {})["primary"] = full_model
     config.setdefault("agents", {}).setdefault("defaults", {}).pop("models", None)
     return {
         "full_model": full_model,
-        "discovered": discovery_ok,
-        "discovered_count": len(discovered_models),
-        "written_count": len(provider["models"]),
+        "provider_count": len(providers),
+        "discovered": discovered_count > 0,
+        "discovered_count": discovered_count,
+        "written_count": written_count,
     }
 
 

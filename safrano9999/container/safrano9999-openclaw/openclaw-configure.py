@@ -134,10 +134,6 @@ def main() -> None:
         tools={"allow": ["*"], "deny": []},
     )
 
-    # Fedora-style LiteLLM/OpenClaw-Harness, intentionally disabled here:
-    # from openclaw_common import configure_litellm_provider
-    # configure_litellm_provider(config, default_model="deepseek-v4-flash")
-
     registered = register_openclaw_plugins(
         config,
         PLUGINS_DIR,
