@@ -22,14 +22,16 @@ key_from_line() {
 }
 
 load_expected() {
-  local file="$1" line key
+  local file line key
   EXPECTED=()
-  [ -f "$file" ] || return 0
-  while IFS= read -r line || [ -n "$line" ]; do
-    key="$(key_from_line "$line" || true)"
-    [ -n "$key" ] || continue
-    EXPECTED["$key"]=1
-  done < "$file"
+  for file in "$@"; do
+    [ -f "$file" ] || continue
+    while IFS= read -r line || [ -n "$line" ]; do
+      key="$(key_from_line "$line" || true)"
+      [ -n "$key" ] || continue
+      EXPECTED["$key"]=1
+    done < "$file"
+  done
 }
 
 known_key() {
@@ -43,9 +45,10 @@ known_key() {
 }
 
 find_legacy() {
-  local actual="$1" example="$2" line key
+  local actual="$1" line key
+  shift
   LEGACY=()
-  load_expected "$example"
+  load_expected "$@"
   [ -f "$actual" ] || return 0
   while IFS= read -r line || [ -n "$line" ]; do
     key="$(key_from_line "$line" || true)"
@@ -83,19 +86,23 @@ rewrite_file() {
 }
 
 declare -A EXPECTED LEGACY
-declare -a all_entries=() keys_env=() keys_conf=()
+declare -a all_entries=() keys_env=() keys_conf=() keys_container=()
 
 find_legacy "$ROOT/.env" "$ROOT/env.example"
 for key in "${!LEGACY[@]}"; do keys_env+=("$key"); all_entries+=(".env:$key"); done
 
-find_legacy "$ROOT/config.conf" "$ROOT/config.conf_example"
+find_legacy "$ROOT/config.conf" "$ROOT/config.conf_example" "$ROOT/container.example"
 for key in "${!LEGACY[@]}"; do keys_conf+=("$key"); all_entries+=("config.conf:$key"); done
+
+find_legacy "$ROOT/container.conf" "$ROOT/container.example"
+for key in "${!LEGACY[@]}"; do keys_container+=("$key"); all_entries+=("container.conf:$key"); done
 
 [ "${#all_entries[@]}" -gt 0 ] || { echo "  Legacy check: skipped."; exit 0; }
 
 printf '  Legacy found:\n'
 [ "${#keys_env[@]}" -gt 0 ] && printf '    .env: %s\n' "${keys_env[*]}"
 [ "${#keys_conf[@]}" -gt 0 ] && printf '    config.conf: %s\n' "${keys_conf[*]}"
+[ "${#keys_container[@]}" -gt 0 ] && printf '    container.conf: %s\n' "${keys_container[*]}"
 printf '    (values hidden)\n'
 printf '    (1) ignore / skip [default]\n'
 printf '    (2) comment out\n'
@@ -110,11 +117,13 @@ case "$choice" in
   2)
     [ "${#keys_env[@]}" -eq 0 ] || rewrite_file "$ROOT/.env" comment "$(printf '%s\034' "${keys_env[@]}")"
     [ "${#keys_conf[@]}" -eq 0 ] || rewrite_file "$ROOT/config.conf" comment "$(printf '%s\034' "${keys_conf[@]}")"
+    [ "${#keys_container[@]}" -eq 0 ] || rewrite_file "$ROOT/container.conf" comment "$(printf '%s\034' "${keys_container[@]}")"
     echo "  Legacy check: commented."
     ;;
   3)
     [ "${#keys_env[@]}" -eq 0 ] || rewrite_file "$ROOT/.env" delete "$(printf '%s\034' "${keys_env[@]}")"
     [ "${#keys_conf[@]}" -eq 0 ] || rewrite_file "$ROOT/config.conf" delete "$(printf '%s\034' "${keys_conf[@]}")"
+    [ "${#keys_container[@]}" -eq 0 ] || rewrite_file "$ROOT/container.conf" delete "$(printf '%s\034' "${keys_container[@]}")"
     echo "  Legacy check: deleted."
     ;;
   *) echo "Invalid choice: $choice" >&2; exit 2 ;;
