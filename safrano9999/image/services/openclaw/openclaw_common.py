@@ -184,10 +184,10 @@ def configure_telegram_main(
     include_binding: bool = False,
     owner_allow: bool = False,
 ) -> bool:
-    if not os.environ.get("TELEGRAMTOKEN_OPENCLAW", "").strip():
+    if not os.environ.get("OPENCLAW_TELEGRAMTOKEN", "").strip():
         return False
 
-    token_ref = env_ref("TELEGRAMTOKEN_OPENCLAW")
+    token_ref = env_ref("OPENCLAW_TELEGRAMTOKEN")
     telegram = config.setdefault("channels", {}).setdefault("telegram", {})
     telegram["enabled"] = True
     telegram["dmPolicy"] = "open"
