@@ -1,0 +1,15 @@
+[Unit]
+Description=Cloudflare Tunnel connector
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+PassEnvironment=TUNNEL_TOKEN
+ExecCondition=/bin/bash -c '[ -n "${TUNNEL_TOKEN}" ]'
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
