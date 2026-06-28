@@ -87,14 +87,21 @@ rewrite_file() {
 
 declare -A EXPECTED LEGACY
 declare -a all_entries=() keys_env=() keys_conf=() keys_container=()
+declare -a env_examples=() config_examples=() container_examples=()
 
-find_legacy "$ROOT/.env" "$ROOT/env.example"
+shopt -s nullglob
+env_examples=("$ROOT"/env*example)
+config_examples=("$ROOT"/config*example)
+container_examples=("$ROOT"/container*example "$ROOT"/config*.container)
+shopt -u nullglob
+
+find_legacy "$ROOT/.env" "${env_examples[@]}"
 for key in "${!LEGACY[@]}"; do keys_env+=("$key"); all_entries+=(".env:$key"); done
 
-find_legacy "$ROOT/config.conf" "$ROOT/config.conf_example" "$ROOT/container.example"
+find_legacy "$ROOT/config.conf" "${config_examples[@]}"
 for key in "${!LEGACY[@]}"; do keys_conf+=("$key"); all_entries+=("config.conf:$key"); done
 
-find_legacy "$ROOT/container.conf" "$ROOT/container.example"
+find_legacy "$ROOT/container.conf" "${container_examples[@]}"
 for key in "${!LEGACY[@]}"; do keys_container+=("$key"); all_entries+=("container.conf:$key"); done
 
 [ "${#all_entries[@]}" -gt 0 ] || { echo "  Legacy check: skipped."; exit 0; }
