@@ -154,7 +154,8 @@ safrano9999_standalone() {
 
 safrano9999_OC_plugins() {
   local root="${OPENCLAW_PLUGINS_DIR:-${SAFRANO9999_DIR:-/opt/safrano9999}}" link=false fullrun=false crontab="" spec
-  local -a specs=() repos=() install_args setup_args
+  local repo lower zip plugin_id stage="${SAFRANO9999_STAGE_DIR:-}"
+  local -a specs=() repos=() staged_repos=() install_args setup_args
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --link) link=true; shift ;;
@@ -167,8 +168,28 @@ safrano9999_OC_plugins() {
   specs+=("$@")
   [ "${#specs[@]}" -gt 0 ] || { echo "safrano9999_OC_plugins: repo name required" >&2; return 2; }
   for spec in "${specs[@]}"; do
+    repo="$(_safrano9999_repo_name "$spec")"
+    lower="$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')"
+    zip="${stage}/${lower}-latest.zip"
+    if [ "$link" = false ] && [ -n "$stage" ] && [ -f "$zip" ]; then
+      [ ! -f "${zip}.sha256" ] || (cd "$stage" && sha256sum -c "$(basename "${zip}.sha256")")
+      openclaw plugins install --force --dangerously-force-unsafe-install "$zip"
+      plugin_id="$(python3 - "$zip" <<'PY'
+import json
+import sys
+import zipfile
+
+with zipfile.ZipFile(sys.argv[1]) as archive:
+    manifest = json.loads(archive.read("openclaw.plugin.json"))
+print(manifest["id"])
+PY
+)"
+      repos+=("$plugin_id")
+      continue
+    fi
     _safrano9999_clone "$spec" "$root"
-    repos+=("$(_safrano9999_repo_name "$spec")")
+    repos+=("$repo")
+    staged_repos+=("$repo")
   done
   _safrano9999_write_webhooks "$root" "${repos[@]}"
   [ "$fullrun" = false ] || _safrano9999_write_fullrun "$root" "${repos[@]}"
@@ -178,9 +199,11 @@ safrano9999_OC_plugins() {
   if [ -f /usr/local/bin/safrano9999_plugins.py ]; then
     setup_args=(setup-python --plugins-dir "$root" --fallback-venv --plugins "${repos[@]}")
     python3 /usr/local/bin/safrano9999_plugins.py "${setup_args[@]}"
-    install_args=(install --plugins-dir "$root")
-    [ "$link" = true ] && install_args+=(--links)
-    install_args+=(--plugins "${repos[@]}")
-    python3 /usr/local/bin/safrano9999_plugins.py "${install_args[@]}"
+    if [ "${#staged_repos[@]}" -gt 0 ]; then
+      install_args=(install --plugins-dir "$root")
+      [ "$link" = true ] && install_args+=(--links)
+      install_args+=(--plugins "${staged_repos[@]}")
+      python3 /usr/local/bin/safrano9999_plugins.py "${install_args[@]}"
+    fi
   fi
 }

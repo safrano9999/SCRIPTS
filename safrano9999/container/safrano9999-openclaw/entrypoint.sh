@@ -36,7 +36,7 @@ fi
 log "configuring OpenClaw (plugins only; no OpenClaw LLM provider)"
 /usr/local/bin/openclaw-configure
 
-zdir="${OPENCLAW_PLUGINS_DIR:-/opt/safrano9999-openclaw}/ZEROINBOX"
+zdir="${OPENCLAW_CONFIG_DIR:-/root/.openclaw}/extensions/zeroinbox"
 if [ -x "${zdir}/.venv/bin/python" ] && [ -f "${zdir}/scripts/gmail-init-labels" ]; then
   log "running ZEROINBOX label init"
   if ( cd "${zdir}" && "${zdir}/.venv/bin/python" scripts/gmail-init-labels --account all ); then
