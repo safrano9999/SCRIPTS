@@ -141,6 +141,7 @@ def register_openclaw_plugins(
     plugins = config.setdefault("plugins", {})
     paths = plugins.setdefault("load", {}).setdefault("paths", [])
     entries = plugins.setdefault("entries", {})
+    extensions_dir = Path(os.environ.get("OPENCLAW_CONFIG_DIR", str(Path.home() / ".openclaw"))) / "extensions"
     registered: list[str] = []
 
     for _repo, plugin_id, repo_path in plugin_dirs(plugins_dir):
@@ -153,11 +154,16 @@ def register_openclaw_plugins(
 
         properties = _manifest_config_properties(manifest)
         if "configPath" in properties:
-            for config_name in ("config.conf", "config.json"):
-                config_path = repo_path / config_name
-                if config_path.exists():
-                    merge_plugin_config(entry, {"configPath": str(config_path)})
-                    break
+            config_roots = (extensions_dir / plugin_id, repo_path)
+            for config_root in config_roots:
+                for config_name in ("config.conf", "config.json"):
+                    config_path = config_root / config_name
+                    if config_path.exists():
+                        merge_plugin_config(entry, {"configPath": str(config_path)})
+                        break
+                else:
+                    continue
+                break
 
         target = telegram_target.strip()
         if target:
