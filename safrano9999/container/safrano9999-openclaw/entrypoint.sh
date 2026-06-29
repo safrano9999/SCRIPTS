@@ -7,14 +7,14 @@ set -euo pipefail
 log() { printf '[entrypoint] %s\n' "$*"; }
 
 if command -v openclaw >/dev/null 2>&1; then
-  OPENCLAW_BIN=(openclaw)
+  OPENCLAW_CMD=(openclaw)
 elif [ -f /app/openclaw.mjs ]; then
-  OPENCLAW_BIN=(node /app/openclaw.mjs)
+  OPENCLAW_CMD=(node /app/openclaw.mjs)
 else
   log "FATAL: cannot find the openclaw CLI"
   exit 1
 fi
-export OPENCLAW_BIN="${OPENCLAW_BIN[*]}"
+export OPENCLAW_BIN="${OPENCLAW_CMD[*]}"
 
 if [ -n "${TS_AUTHKEY:-}" ]; then
   log "starting tailscaled (state: ${TS_STATE_DIR:=/var/lib/tailscale})"
@@ -47,13 +47,28 @@ if [ -x "${zdir}/.venv/bin/python" ] && [ -f "${zdir}/scripts/gmail-init-labels"
 fi
 
 if [ -n "${KACHELMANN_PORT:-}" ]; then
-  kdir="${OPENCLAW_PLUGINS_DIR:-/opt/safrano9999-openclaw}/KACHELMANN"
+  kdir="${OPENCLAW_CONFIG_DIR:-/root/.openclaw}/extensions/kachelmann"
   if [ -x "${kdir}/.venv/bin/uvicorn" ]; then
     log "starting KACHELMANN WebUI on 0.0.0.0:${KACHELMANN_PORT}"
     ( cd "${kdir}" && exec ./.venv/bin/uvicorn webui:app --host 0.0.0.0 --port "${KACHELMANN_PORT}" ) \
       >/var/log/kachelmann-webui.log 2>&1 &
+    for _ in {1..30}; do
+      curl -sS -o /dev/null "http://127.0.0.1:${KACHELMANN_PORT}/" 2>/dev/null && break
+      sleep 0.2
+    done
   else
     log "WARN: KACHELMANN venv/uvicorn missing - WebUI not started"
+  fi
+fi
+
+cdir="${OPENCLAW_CONFIG_DIR:-/root/.openclaw}/extensions/citadel"
+[ -x "${cdir}/scan.sh" ] || cdir="${OPENCLAW_PLUGINS_DIR:-/opt/safrano9999-openclaw}/CITADEL"
+if [ -x "${cdir}/scan.sh" ]; then
+  log "scanning services for CITADEL"
+  if (cd "$cdir" && ./scan.sh) >/var/log/citadel-scan.log 2>&1; then
+    log "CITADEL scan done"
+  else
+    log "WARN: CITADEL localhost scan failed - continuing"
   fi
 fi
 
@@ -69,5 +84,5 @@ if [ "${SAFRANO9999_FULLRUN_ON_START:-1}" = "1" ] && [ -x "${SAFRANO9999_FULLRUN
   ( sleep "${SAFRANO9999_FULLRUN_DELAY:-100}"; "${SAFRANO9999_FULLRUN_SCRIPT:-/usr/local/bin/safrano9999-fullrun}" ) &
 fi
 
-log "starting gateway: ${OPENCLAW_BIN} ${gw_args[*]}"
-exec ${OPENCLAW_BIN} "${gw_args[@]}"
+log "starting gateway: ${OPENCLAW_CMD[*]} ${gw_args[*]}"
+exec "${OPENCLAW_CMD[@]}" "${gw_args[@]}"
