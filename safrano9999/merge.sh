@@ -72,7 +72,7 @@ collect_plugin_files() {
         lower="$(printf '%s' "${name%@*}" | tr '[:upper:]' '[:lower:]')"
         zip_path="$SAFRANO_DIR/${lower}-latest.zip"
         [ -f "$zip_path" ] || continue
-        unzip -Z1 "$zip_path" | grep -qx "$filename" || continue
+        unzip -Z1 "$zip_path" | awk -v wanted="$filename" '$0 == wanted { found=1 } END { exit !found }' || continue
         extracted="$TMP_DIR/$lower/$filename"
         mkdir -p "$(dirname "$extracted")"
         unzip -p "$zip_path" "$filename" > "$extracted"
