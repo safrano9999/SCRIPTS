@@ -20,7 +20,7 @@ from safrano9999_plugins import (
 
 CONFIG_PATH = Path(os.environ.get("OPENCLAW_CONFIG", "/root/.openclaw/openclaw.json"))
 GATEWAY_PORT = int(os.environ.get("OPENCLAW_GATEWAY_PORT", "18789") or "18789")
-PLUGINS_DIR = Path(os.environ.get("OPENCLAW_PLUGINS_DIR", "/opt/safrano9999-openclaw"))
+PLUGINS_DIR = Path(os.environ.get("OPENCLAW_PLUGINS_DIR", str(CONFIG_PATH.parent / "extensions")))
 
 CONTAINER_ONLY_COMMAND_ALIASES = {
     "ZEROINBOX": ("zeroinbox", "mails"),

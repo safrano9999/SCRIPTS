@@ -62,7 +62,6 @@ if [ -n "${KACHELMANN_PORT:-}" ]; then
 fi
 
 cdir="${OPENCLAW_CONFIG_DIR:-/root/.openclaw}/extensions/citadel"
-[ -x "${cdir}/scan.sh" ] || cdir="${OPENCLAW_PLUGINS_DIR:-/opt/safrano9999-openclaw}/CITADEL"
 if [ -x "${cdir}/scan.sh" ]; then
   log "scanning services for CITADEL"
   if (cd "$cdir" && ./scan.sh) >/var/log/citadel-scan.log 2>&1; then
