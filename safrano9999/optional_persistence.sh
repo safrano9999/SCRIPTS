@@ -27,16 +27,11 @@ read_key() {
 
 path_keys() {
     local config_dir="$1" file
-    for file in \
-        "$config_dir"/config*.conf_example \
-        "$config_dir/config.conf" \
-        "$config_dir"/*build.conf_example \
-        "$config_dir/build.conf" \
-        "$config_dir/container.conf"; do
+    for file in "$config_dir"/*build.conf_example "$config_dir/build.conf" "$config_dir/container.conf"; do
         [ -f "$file" ] || continue
         awk '
         /^[[:space:]]*#/ { next }
-        /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*_(PERSISTENT|VOLUME)_PATH[[:space:]]*=/ {
+        /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*_PERSISTENT_PATH[[:space:]]*=/ {
             key=$0
             sub(/[[:space:]]*=.*/, "", key)
             sub(/^[[:space:]]*/, "", key)
@@ -49,12 +44,7 @@ configured_path() {
     local config_dir="$1" key="$2" file value
     value="${!key:-}"
     [ -n "$value" ] && { printf '%s\n' "$value"; return 0; }
-    for file in \
-        "$config_dir/container.conf" \
-        "$config_dir/config.conf" \
-        "$config_dir/build.conf" \
-        "$config_dir"/config*.conf_example \
-        "$config_dir"/*build.conf_example; do
+    for file in "$config_dir/container.conf" "$config_dir/build.conf" "$config_dir"/*build.conf_example; do
         value="$(read_key "$file" "$key" || true)"
         [ -n "$value" ] && { printf '%s\n' "$value"; return 0; }
     done
@@ -99,42 +89,17 @@ case "$command" in
     mounts)
         [ -n "$container_name" ] || { echo "mounts requires --container" >&2; exit 2; }
         while IFS=$'\t' read -r key path; do
-            case "$key" in
-                *_PERSISTENT_PATH) prefix="${key%_PERSISTENT_PATH}" ;;
-                *_VOLUME_PATH) prefix="${key%_VOLUME_PATH}" ;;
-            esac
+            prefix="${key%_PERSISTENT_PATH}"
             printf '%s-%s-persistent:%s:Z\n' "$(safe_name "$container_name")" "$(safe_name "$prefix")" "$path"
         done < <(emit_entries "$config_dir")
         ;;
     init)
         while IFS= read -r key; do
-            [[ "$key" == *_PERSISTENT_PATH || "$key" == *_VOLUME_PATH ]] || continue
+            [[ "$key" == *_PERSISTENT_PATH ]] || continue
             path="${!key:-}"
             case "${path,,}" in ""|blank|null) continue ;; esac
             valid_path "$path" || { echo "Invalid $key: $path" >&2; exit 1; }
             mkdir -p "$path"
-            if [[ "$key" == *_AUTH_VOLUME_PATH ]]; then
-                app="${key%_AUTH_VOLUME_PATH}"
-                app_home_key="${app}_HOME"
-                app_home="${!app_home_key:-${HOME:-/root}/.${app,,}}"
-                auth_file="$app_home/auth.json"
-                target="$path/auth.json"
-                mkdir -p "$app_home"
-                if [ -f "$auth_file" ] && [ ! -e "$target" ]; then
-                    mv "$auth_file" "$target"
-                elif [ -e "$auth_file" ] || [ -L "$auth_file" ]; then
-                    rm -f "$auth_file"
-                fi
-                ln -sfn "$target" "$auth_file"
-                if [ "$app" = "CODEX" ]; then
-                    config_file="$app_home/config.toml"
-                    if grep -q '^[[:space:]]*cli_auth_credentials_store[[:space:]]*=' "$config_file" 2>/dev/null; then
-                        sed -i 's/^[[:space:]]*cli_auth_credentials_store[[:space:]]*=.*/cli_auth_credentials_store = "file"/' "$config_file"
-                    else
-                        printf '\ncli_auth_credentials_store = "file"\n' >> "$config_file"
-                    fi
-                fi
-            fi
         done < <(compgen -e | LC_ALL=C sort -u)
         ;;
     *)
