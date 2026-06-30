@@ -45,7 +45,7 @@ tmp=$(mktemp); trap 'rm -f "$tmp"*; chmod -R a+rX "$STORE"' EXIT
 while read -r ref; do
   echo "FETCH metadata $ref"
   data=$("${SKOPEO[@]}" "docker://$ref")
-  echo "ONLINE $ref $(jq -r '.Digest') ($(jq '.Layers | length') layers)" <<<"$data"
+  echo "ONLINE $ref $(jq -r '.Digest' <<<"$data") ($(jq '.Layers | length' <<<"$data") layers)"
   jq --arg ref "$ref" '{ref:$ref,digest:.Digest,layers:.Layers}' <<<"$data" >>"$tmp"
 done < <(jq -r '.images[]' "$SOT")
 
