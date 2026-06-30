@@ -155,7 +155,7 @@ safrano9999_standalone() {
 safrano9999_OC_plugins() {
   local root="${OPENCLAW_PLUGINS_DIR:-${SAFRANO9999_DIR:-/opt/safrano9999}}" link=false fullrun=false crontab="" spec
   local repo lower zip plugin_id stage="${SAFRANO9999_STAGE_DIR:-}"
-  local -a specs=() repos=() staged_repos=() install_args setup_args
+  local -a specs=() repos=() staged_repos=() install_args
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --link) link=true; shift ;;
@@ -197,8 +197,6 @@ PY
   [ -z "$crontab" ] || printf '%s\n' "$crontab" > "$root/.openclaw-crontab"
 
   if [ -f /usr/local/bin/safrano9999_plugins.py ]; then
-    setup_args=(setup-python --plugins-dir "$root" --fallback-venv --plugins "${repos[@]}")
-    python3 /usr/local/bin/safrano9999_plugins.py "${setup_args[@]}"
     if [ "${#staged_repos[@]}" -gt 0 ]; then
       install_args=(install --plugins-dir "$root")
       [ "$link" = true ] && install_args+=(--links)

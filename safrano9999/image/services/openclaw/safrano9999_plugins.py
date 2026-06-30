@@ -153,6 +153,8 @@ def register_openclaw_plugins(
         registered.append(plugin_id)
 
         properties = _manifest_config_properties(manifest)
+        if "autoSetupPython" in properties:
+            merge_plugin_config(entry, {"autoSetupPython": False})
         if "configPath" in properties:
             config_roots = (extensions_dir / plugin_id, repo_path)
             for config_root in config_roots:

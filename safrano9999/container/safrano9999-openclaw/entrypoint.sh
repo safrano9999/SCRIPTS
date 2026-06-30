@@ -37,9 +37,9 @@ log "configuring OpenClaw (plugins only; no OpenClaw LLM provider)"
 /usr/local/bin/openclaw-configure
 
 zdir="${OPENCLAW_CONFIG_DIR:-/root/.openclaw}/extensions/zeroinbox"
-if [ -x "${zdir}/.venv/bin/python" ] && [ -f "${zdir}/scripts/gmail-init-labels" ]; then
+if [ -f "${zdir}/scripts/gmail-init-labels" ]; then
   log "running ZEROINBOX label init"
-  if ( cd "${zdir}" && "${zdir}/.venv/bin/python" scripts/gmail-init-labels --account all ); then
+  if ( cd "${zdir}" && python3 scripts/gmail-init-labels --account all ); then
     log "ZEROINBOX label init done"
   else
     log "WARN: ZEROINBOX label init failed - continuing"
@@ -48,16 +48,16 @@ fi
 
 if [ -n "${KACHELMANN_PORT:-}" ]; then
   kdir="${OPENCLAW_CONFIG_DIR:-/root/.openclaw}/extensions/kachelmann"
-  if [ -x "${kdir}/.venv/bin/uvicorn" ]; then
+  if [ -f "${kdir}/webui.py" ]; then
     log "starting KACHELMANN WebUI on 0.0.0.0:${KACHELMANN_PORT}"
-    ( cd "${kdir}" && exec ./.venv/bin/uvicorn webui:app --host 0.0.0.0 --port "${KACHELMANN_PORT}" ) \
+    ( cd "${kdir}" && exec python3 -m uvicorn webui:app --host 0.0.0.0 --port "${KACHELMANN_PORT}" ) \
       >/var/log/kachelmann-webui.log 2>&1 &
     for _ in {1..30}; do
       curl -sS -o /dev/null "http://127.0.0.1:${KACHELMANN_PORT}/" 2>/dev/null && break
       sleep 0.2
     done
   else
-    log "WARN: KACHELMANN venv/uvicorn missing - WebUI not started"
+    log "WARN: KACHELMANN webui.py missing - WebUI not started"
   fi
 fi
 
