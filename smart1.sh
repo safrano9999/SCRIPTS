@@ -90,5 +90,5 @@ if [[ " $* " == *" --update "* ]]; then
     echo "UPDATE $image"
     podman --root "$STORE" --runroot /run/containers/storage --storage-opt overlay.force_mask=shared --storage-opt overlay.mount_program=/usr/bin/fuse-overlayfs pull "${PULL_AUTH[@]}" "$image"
   done < <(jq -r '.images[]' "$SOT")
-  chmod -R a+rX "$STORE"
+  echo "PERMISSIONS chmod -R a+rX $STORE"; chmod -R a+rX "$STORE"
 fi
