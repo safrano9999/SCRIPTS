@@ -69,6 +69,11 @@ if [[ " $* " == *" --prune "* ]]; then : >"$tmp.protected-images"; : >"$tmp.prot
   jq --slurpfile ids "$tmp.pi" --slurpfile old "$STORE/overlay-images/images.json" '. + [$old[0][] | select(.id as $id | $ids[0] | index($id))] | unique_by(.id)' "$STORE/overlay-images/images.json.new" >"$tmp.in"; mv "$tmp.in" "$STORE/overlay-images/images.json.new"
   jq --slurpfile ids "$tmp.pl" --slurpfile old "$STORE/overlay-layers/layers.json" '. + [$old[0][] | select(."diff-digest" as $id | $ids[0] | index($id))] | unique_by(.id)' "$STORE/overlay-layers/layers.json.new" >"$tmp.ln"; mv "$tmp.ln" "$STORE/overlay-layers/layers.json.new"; fi
 
+while jq -e '. as $all | any(.[]; (.parent // "") as $p | $p != "" and ($all | any(.id == $p) | not))' "$STORE/overlay-layers/layers.json.new" >/dev/null; do
+  jq '. as $all | [.[] | select((.parent // "") as $p | $p == "" or ($all | any(.id == $p)))]' "$STORE/overlay-layers/layers.json.new" >"$tmp.chain"; mv "$tmp.chain" "$STORE/overlay-layers/layers.json.new"
+done
+jq --slurpfile layers "$STORE/overlay-layers/layers.json.new" '[.[] | select(.layer as $id | $layers[0] | any(.id == $id))]' "$STORE/overlay-images/images.json.new" >"$tmp.valid-images"; mv "$tmp.valid-images" "$STORE/overlay-images/images.json.new"
+
 mapfile -t layers < <(jq -r '.[].id' "$STORE/overlay-layers/layers.json.new")
 mapfile -t images < <(jq -r '.[].id' "$STORE/overlay-images/images.json.new")
 for path in "$STORE"/overlay/[0-9a-f]*; do id=${path##*/}; if [[ " ${layers[*]} " == *" $id "* ]]; then echo "KEEP layer $id"; else echo "REMOVE layer $id"; rm -rf -- "$path"; fi; done
