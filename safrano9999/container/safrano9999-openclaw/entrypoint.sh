@@ -16,6 +16,8 @@ else
 fi
 export OPENCLAW_BIN="${OPENCLAW_CMD[*]}"
 
+/usr/local/bin/named_volume_links.sh
+
 if [ -n "${TS_AUTHKEY:-}" ]; then
   log "starting tailscaled (state: ${TS_STATE_DIR:=/var/lib/tailscale})"
   mkdir -p "${TS_STATE_DIR}" /run/tailscale
