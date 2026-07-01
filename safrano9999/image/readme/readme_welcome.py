@@ -7,10 +7,11 @@ import html
 import os
 import re
 import shutil
-import subprocess
-import sys
+import socket
 from datetime import datetime
 from pathlib import Path
+
+from python_header import env
 
 from reportlab.lib.colors import HexColor, white
 from reportlab.lib.enums import TA_CENTER
@@ -28,49 +29,38 @@ from reportlab.platypus import (
 
 
 README_DIR = Path(os.environ.get("SAFRANO9999_README_DIR", "/README"))
-META_DIR = Path("/usr/local/share/fedora44-ai/readme")
+LOCAL_REFERENCE = Path(__file__).resolve().with_name("ref.conf")
+REF_SOURCE = LOCAL_REFERENCE if LOCAL_REFERENCE.is_file() else Path("/opt/safrano9999/WELCOME/ref.conf")
 PAPER_SOURCE = Path(
     "/opt/safrano9999/SCRIPTS/safrano9999/image/readme/paper.pdf"
 )
 OUTPUT = README_DIR / "welcome.pdf"
-SOURCES = (
-    ("Environment", META_DIR / "env.example"),
-    ("Configuration", META_DIR / "config.conf_example"),
-    ("Container", META_DIR / "container.example"),
-    ("Build", META_DIR / "fedora.build.conf_example"),
-)
-ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=")
+SECTIONS = ("Environment", "Configuration", "Container", "Build")
+REFERENCE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def canonical_key(key: str) -> str:
     return "_".join(part for part in key.split("_") if not part.isdigit())
 
 
-def read_specs() -> tuple[dict[str, tuple[str, bool]], list[str]]:
-    specs: dict[str, tuple[str, bool]] = {}
+def read_specs() -> tuple[dict[str, str], list[str]]:
+    specs: dict[str, str] = {}
     order: list[str] = []
-    for section, path in SOURCES:
-        secret = False
-        if not path.is_file():
+    section = ""
+    if not REF_SOURCE.is_file():
+        return specs, order
+    for raw in REF_SOURCE.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1]
             continue
-        for raw in path.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if line == "#secret":
-                secret = True
-                continue
-            match = ASSIGNMENT.match(line)
-            if match:
-                key = match.group(1)
-                if key not in specs:
-                    order.append(key)
-                    specs[key] = (section, secret)
-                secret = False
-            elif not line:
-                secret = False
+        if section in SECTIONS and REFERENCE.fullmatch(line) and line not in specs:
+            order.append(line)
+            specs[line] = section
     return specs, order
 
 
-def resolved_entries() -> dict[str, list[tuple[str, str, bool]]]:
+def resolved_entries() -> dict[str, list[tuple[str, str]]]:
     specs, order = read_specs()
     by_canonical = {canonical_key(key): value for key, value in specs.items()}
     keys = list(order)
@@ -79,21 +69,16 @@ def resolved_entries() -> dict[str, list[tuple[str, str, bool]]]:
             keys.append(key)
             specs[key] = by_canonical[canonical_key(key)]
 
-    for key, value in os.environ.items():
-        if canonical_key(key) != "OPENAI_V1_API_KEY_ALIAS":
-            continue
-        alias = value.strip()
-        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", alias) and alias not in specs:
-            keys.append(alias)
-            specs[alias] = ("Environment", True)
-
-    result = {section: [] for section, _ in SOURCES}
+    result = {section: [] for section in SECTIONS}
     for key in keys:
-        section, secret = specs[key]
-        value = os.environ.get(key, "")
-        shown = "exists" if secret and value else "unset" if secret else value or "blank"
-        result[section].append((key, shown, secret))
+        section = specs[key]
+        value = env.get(key, "")
+        result[section].append((key, value or "blank"))
     return result
+
+
+def runtime_name() -> str:
+    return env.get("CONTAINER_NAME", "").strip() or socket.gethostname()
 
 
 def styles() -> dict[str, ParagraphStyle]:
@@ -149,15 +134,16 @@ def build_pdf() -> Path:
         shutil.copy2(PAPER_SOURCE, paper_target)
 
     pdf_styles = styles()
+    name = runtime_name()
     doc = SimpleDocTemplate(
         str(OUTPUT), pagesize=A4, leftMargin=1.55 * cm, rightMargin=1.55 * cm,
         topMargin=1.45 * cm, bottomMargin=1.45 * cm,
-        title="Welcome to fedora44-ai", author="safrano9999",
+        title=f"Welcome to {name}", author="safrano9999",
     )
     story: list = [
-        Paragraph("WELCOME", pdf_styles["header"]),
+        Paragraph(f"WELCOME TO {html.escape(name)}", pdf_styles["header"]),
         Paragraph(
-            "fedora44-ai runtime map and agent starting point",
+            "by safrano9999 - runtime map and agent starting point",
             pdf_styles["subheader"],
         ),
         HRFlowable(width="100%", thickness=3, color=pdf_styles["accent"], spaceAfter=14),
@@ -175,10 +161,9 @@ def build_pdf() -> Path:
     add_section(
         story,
         "Runtime documentation",
-        "This file is rebuilt inside the ephemeral /README directory. Values "
-        "marked <b>#secret</b> in an example are never printed; only their "
-        "presence is reported. Configuration, container and build values remain "
-        "visible so an agent can inspect the running system.",
+        "This file is rebuilt inside the ephemeral /README directory. Variables "
+        "marked <b>#secret</b> never enter ref.conf and therefore cannot appear "
+        "here. Non-secret runtime values remain visible for inspection.",
         pdf_styles,
     )
     add_section(
@@ -191,14 +176,13 @@ def build_pdf() -> Path:
     )
 
     entries = resolved_entries()
-    for section, _ in SOURCES:
+    for section in SECTIONS:
         story.append(PageBreak())
         story.append(Paragraph(f"  {section} variables  ", pdf_styles["section"]))
-        for key, value, secret in entries[section]:
-            suffix = " <font color='#68717d'>(secret)</font>" if secret else ""
+        for key, value in entries[section]:
             story.append(
                 Paragraph(
-                    f"<b>{html.escape(key)}</b>{suffix}<br/>"
+                    f"<b>{html.escape(key)}</b><br/>"
                     f"{html.escape(value)}",
                     pdf_styles["entry"],
                 )
@@ -261,41 +245,5 @@ def build_pdf() -> Path:
     return OUTPUT
 
 
-def deliver(pdf: Path) -> None:
-    target = os.environ.get("OPENCLAW_TELEGRAM_CHAT_ID", "").split(",", 1)[0].strip()
-    if not target:
-        print("Welcome PDF delivery skipped: OPENCLAW_TELEGRAM_CHAT_ID is empty")
-        return
-    subprocess.run(
-        [
-            "openclaw", "message", "send", "--channel", "telegram",
-            "--target", target, "--message", "fedora44-ai welcome documentation",
-            "--media", str(pdf), "--force-document", "--json",
-        ],
-        check=True,
-    )
-
-
-def fullrun() -> None:
-    if os.environ.get("SAFRANO9999_FULLRUN_ON_START", "1").lower() not in {
-        "1", "true", "yes", "on",
-    }:
-        return
-    script = Path(os.environ.get("SAFRANO9999_FULLRUN_SCRIPT", "/usr/local/bin/safrano9999-fullrun"))
-    if script.is_file():
-        subprocess.run([str(script)], check=True)
-
-
-def main() -> int:
-    status = 0
-    try:
-        deliver(build_pdf())
-    except Exception as exc:
-        status = 1
-        print(f"Welcome documentation failed: {exc}", file=sys.stderr)
-    fullrun()
-    return status
-
-
 if __name__ == "__main__":
-    raise SystemExit(main())
+    build_pdf()
