@@ -5,6 +5,11 @@ IFS=';' read -ra specs <<< "${NAMED_VOLUME_LINKS:-}"
 for spec in "${specs[@]}"; do
     IFS='|' read -r _ source target kind <<< "$spec"
     [ -n "$source" ] && [ -n "$target" ] || continue
+    if [[ "$target" =~ ^@([A-Za-z_][A-Za-z0-9_]*)@(.*)$ ]]; then
+        variable="${BASH_REMATCH[1]}"
+        [ -n "${!variable:-}" ] || { echo "Missing $variable for named-volume target" >&2; exit 1; }
+        target="${!variable}${BASH_REMATCH[2]}"
+    fi
     if [ -z "$kind" ]; then
         if [ -f "$source" ] || [ -f "$target" ]; then kind=file; else kind=dir; fi
     fi
