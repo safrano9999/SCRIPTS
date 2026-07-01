@@ -62,6 +62,7 @@ for spec in "${specs[@]}"; do
     if [ -z "$kind" ]; then
         if [ -f "$source" ] || [ -f "$target" ]; then kind=file; else kind=dir; fi
     fi
+    if [ "$kind" = link ]; then [ ! -d "$mount" ] || { rm -rf "$target"; ln -s "$source" "$target"; }; continue; fi
     mkdir -p "$(dirname "$source")"
     mkdir -p "$(dirname "$target")"
     if [ "$kind" = file ]; then

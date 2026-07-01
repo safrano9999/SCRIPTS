@@ -74,7 +74,7 @@ enabled_named_volume_specs() {
             echo "Invalid #named-volume for $key" >&2
             return 1
         }
-        case "$kind" in ""|file|dir) ;; *) echo "Invalid #named-volume type for $key" >&2; return 1 ;; esac
+        case "$kind" in ""|file|dir|link) ;; *) echo "Invalid #named-volume type for $key" >&2; return 1 ;; esac
         printf '%s\t%s\t%s\t%s\t%s\n' "$key" "$mount" "$source" "$target" "$kind"
     done < <(named_volume_specs "$config_dir" | awk -F '\t' '!seen[$0]++')
 }
