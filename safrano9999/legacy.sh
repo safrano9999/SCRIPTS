@@ -36,6 +36,7 @@ load_expected() {
 
 known_key() {
   local key="$1"
+  [[ "$key" == *_API_KEY ]] && return 0
   while [ -n "$key" ]; do
     [ -n "${EXPECTED[$key]:-}" ] && return 0
     [[ "$key" == *_* ]] || break
