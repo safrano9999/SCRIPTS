@@ -1,0 +1,13 @@
+[Unit]
+Description=Build and deliver safcontainer welcome documentation
+After=openclaw.service
+Requires=openclaw.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 100
+ExecStart=/usr/local/bin/safrano9999-welcome
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
