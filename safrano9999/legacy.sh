@@ -2,6 +2,15 @@
 set -euo pipefail
 
 ROOT="${1:-$(pwd)}"
+if [ -n "${CONFIG_CONTAINER_NAME:-}" ]; then
+  ENV_FILE="$ROOT/$CONFIG_CONTAINER_NAME.env"
+  CONFIG_FILE="$ROOT/${CONFIG_CONTAINER_NAME}_config.conf"
+  CONTAINER_FILE="$ROOT/${CONFIG_CONTAINER_NAME}_container.conf"
+else
+  ENV_FILE="$ROOT/.env"
+  CONFIG_FILE="$ROOT/config.conf"
+  CONTAINER_FILE="$ROOT/container.conf"
+fi
 
 trim() {
   local value="$1"
@@ -96,21 +105,21 @@ config_examples=("$ROOT"/config*example)
 container_examples=("$ROOT"/container*example "$ROOT"/config*.container)
 shopt -u nullglob
 
-find_legacy "$ROOT/.env" "${env_examples[@]}"
-for key in "${!LEGACY[@]}"; do keys_env+=("$key"); all_entries+=(".env:$key"); done
+find_legacy "$ENV_FILE" "${env_examples[@]}"
+for key in "${!LEGACY[@]}"; do keys_env+=("$key"); all_entries+=("$(basename "$ENV_FILE"):$key"); done
 
-find_legacy "$ROOT/config.conf" "${config_examples[@]}"
-for key in "${!LEGACY[@]}"; do keys_conf+=("$key"); all_entries+=("config.conf:$key"); done
+find_legacy "$CONFIG_FILE" "${config_examples[@]}"
+for key in "${!LEGACY[@]}"; do keys_conf+=("$key"); all_entries+=("$(basename "$CONFIG_FILE"):$key"); done
 
-find_legacy "$ROOT/container.conf" "${container_examples[@]}"
-for key in "${!LEGACY[@]}"; do keys_container+=("$key"); all_entries+=("container.conf:$key"); done
+find_legacy "$CONTAINER_FILE" "${container_examples[@]}"
+for key in "${!LEGACY[@]}"; do keys_container+=("$key"); all_entries+=("$(basename "$CONTAINER_FILE"):$key"); done
 
 [ "${#all_entries[@]}" -gt 0 ] || { echo "  Legacy check: skipped."; exit 0; }
 
 printf '  Legacy found:\n'
-[ "${#keys_env[@]}" -gt 0 ] && printf '    .env: %s\n' "${keys_env[*]}"
-[ "${#keys_conf[@]}" -gt 0 ] && printf '    config.conf: %s\n' "${keys_conf[*]}"
-[ "${#keys_container[@]}" -gt 0 ] && printf '    container.conf: %s\n' "${keys_container[*]}"
+[ "${#keys_env[@]}" -gt 0 ] && printf '    %s: %s\n' "$(basename "$ENV_FILE")" "${keys_env[*]}"
+[ "${#keys_conf[@]}" -gt 0 ] && printf '    %s: %s\n' "$(basename "$CONFIG_FILE")" "${keys_conf[*]}"
+[ "${#keys_container[@]}" -gt 0 ] && printf '    %s: %s\n' "$(basename "$CONTAINER_FILE")" "${keys_container[*]}"
 printf '    (values hidden)\n'
 printf '    (1) ignore / skip [default]\n'
 printf '    (2) comment out\n'
@@ -123,15 +132,15 @@ choice="${choice:-1}"
 case "$choice" in
   1) echo "  Legacy check: ignored." ;;
   2)
-    [ "${#keys_env[@]}" -eq 0 ] || rewrite_file "$ROOT/.env" comment "$(printf '%s\034' "${keys_env[@]}")"
-    [ "${#keys_conf[@]}" -eq 0 ] || rewrite_file "$ROOT/config.conf" comment "$(printf '%s\034' "${keys_conf[@]}")"
-    [ "${#keys_container[@]}" -eq 0 ] || rewrite_file "$ROOT/container.conf" comment "$(printf '%s\034' "${keys_container[@]}")"
+    [ "${#keys_env[@]}" -eq 0 ] || rewrite_file "$ENV_FILE" comment "$(printf '%s\034' "${keys_env[@]}")"
+    [ "${#keys_conf[@]}" -eq 0 ] || rewrite_file "$CONFIG_FILE" comment "$(printf '%s\034' "${keys_conf[@]}")"
+    [ "${#keys_container[@]}" -eq 0 ] || rewrite_file "$CONTAINER_FILE" comment "$(printf '%s\034' "${keys_container[@]}")"
     echo "  Legacy check: commented."
     ;;
   3)
-    [ "${#keys_env[@]}" -eq 0 ] || rewrite_file "$ROOT/.env" delete "$(printf '%s\034' "${keys_env[@]}")"
-    [ "${#keys_conf[@]}" -eq 0 ] || rewrite_file "$ROOT/config.conf" delete "$(printf '%s\034' "${keys_conf[@]}")"
-    [ "${#keys_container[@]}" -eq 0 ] || rewrite_file "$ROOT/container.conf" delete "$(printf '%s\034' "${keys_container[@]}")"
+    [ "${#keys_env[@]}" -eq 0 ] || rewrite_file "$ENV_FILE" delete "$(printf '%s\034' "${keys_env[@]}")"
+    [ "${#keys_conf[@]}" -eq 0 ] || rewrite_file "$CONFIG_FILE" delete "$(printf '%s\034' "${keys_conf[@]}")"
+    [ "${#keys_container[@]}" -eq 0 ] || rewrite_file "$CONTAINER_FILE" delete "$(printf '%s\034' "${keys_container[@]}")"
     echo "  Legacy check: deleted."
     ;;
   *) echo "Invalid choice: $choice" >&2; exit 2 ;;
