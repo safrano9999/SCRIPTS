@@ -8,7 +8,7 @@ Type=simple
 PassEnvironment=OPENAI_V1_PROVIDER OPENAI_V1_URL OPENAI_V1_PORT OPENAI_V1_KEY HERMES_OPENAI_V1_DEFAULT_LLM HERMES_START HERMES_TELEGRAMTOKEN HERMES_API_SERVER_KEY HERMES_API_SERVER_PORT HERMES_API_SERVER_HOST API_SERVER_KEY API_SERVER_CORS_ORIGINS API_SERVER_MODEL_NAME
 Environment=HOME=/root
 ExecCondition=/bin/bash -c '[ "$${HERMES_START:-1}" = "1" ] && [ -n "$$OPENAI_V1_KEY" ] && [ -n "$$OPENAI_V1_URL" ] && [ -n "$$OPENAI_V1_PORT" ]'
-ExecStartPre=/usr/local/bin/hermes-configure-openai-v1
+#ExecStartPre=/usr/local/bin/hermes-configure-openai-v1
 ExecStart=/bin/bash -lc 'set -e; if [ -n "$${HERMES_API_SERVER_KEY:-}" ]; then export API_SERVER_KEY="$$HERMES_API_SERVER_KEY"; fi; if [ -n "$${API_SERVER_KEY:-}" ]; then export API_SERVER_ENABLED=true; export API_SERVER_HOST="$${HERMES_API_SERVER_HOST:-0.0.0.0}"; export API_SERVER_PORT="$${HERMES_API_SERVER_PORT:-8642}"; fi; export GATEWAY_ALLOW_ALL_USERS=true; export TELEGRAM_ALLOW_ALL_USERS=true; export HERMES_ALLOW_ROOT_GATEWAY=1; export HERMES_ACCEPT_HOOKS=1; if [ -n "$$HERMES_TELEGRAMTOKEN" ] && [ "$$HERMES_TELEGRAMTOKEN" != "Hermes-Agent" ]; then export TELEGRAM_BOT_TOKEN="$$HERMES_TELEGRAMTOKEN"; fi; exec /usr/local/bin/hermes gateway run --replace'
 Restart=on-failure
 RestartSec=5
