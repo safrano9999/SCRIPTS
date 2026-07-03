@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-tag="${OPENCLAW_PATCH_TAG:-2026.6.10-deterministic.1}"
-asset="${OPENCLAW_PATCH_ASSET:-openclaw-2026.6.10-deterministic-e15d0c89.tar.gz}"
+tag="${OPENCLAW_PATCH_TAG:-2026.6.11-deterministic.1}"
+asset="${OPENCLAW_PATCH_ASSET:-openclaw-2026.6.11-deterministic-d0c7c00a.tar.gz}"
 url="${OPENCLAW_PATCH_URL:-https://github.com/safrano9999/openclaw/releases/download/$tag}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
