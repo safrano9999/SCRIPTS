@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "images": [
-    "docker.io/safrano9999/fedora44-ai:latest",
-    "docker.io/safrano9999/safrano9999-openclaw:latest",
-    "ghcr.io/berriai/litellm-database:latest",
-    "quay.io/fedora/postgresql-18"
-  ]
-}
