@@ -43,16 +43,13 @@ PULL_AUTH=(); [[ -r "$AUTH" ]] && SKOPEO+=(--authfile "$AUTH") && PULL_AUTH=(--a
 tmp=$(mktemp); trap 'rm -f "$tmp"*; chmod -R a+rX "$STORE"' EXIT
 
 registry_login() {
-  local registry="$1" uid="${SUDO_UID:-$(id -u)}" user home login_user login_secret
-  read -rp "$registry username: " login_user </dev/tty
-  read -rsp "$registry password/token: " login_secret </dev/tty; echo >/dev/tty
+  local registry="$1" uid="${SUDO_UID:-$(id -u)}" user home
   if (( EUID == 0 )) && [[ -n ${SUDO_UID:-} ]]; then
     IFS=: read -r user _ _ _ _ home _ < <(getent passwd "$uid")
-    printf '%s\n' "$login_secret" | runuser -u "$user" -- env HOME="$home" XDG_RUNTIME_DIR="/run/user/$uid" podman login --username "$login_user" --password-stdin "$registry"
+    runuser -u "$user" -- env HOME="$home" XDG_RUNTIME_DIR="/run/user/$uid" podman login "$registry" </dev/tty >/dev/tty
   else
-    printf '%s\n' "$login_secret" | podman login --username "$login_user" --password-stdin "$registry"
+    podman login "$registry" </dev/tty >/dev/tty
   fi
-  unset login_secret
   SKOPEO=(skopeo inspect --authfile "$AUTH"); PULL_AUTH=(--authfile "$AUTH")
 }
 
