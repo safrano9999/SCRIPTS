@@ -42,9 +42,25 @@ SKOPEO=(skopeo inspect)
 PULL_AUTH=(); [[ -r "$AUTH" ]] && SKOPEO+=(--authfile "$AUTH") && PULL_AUTH=(--authfile "$AUTH")
 tmp=$(mktemp); trap 'rm -f "$tmp"*; chmod -R a+rX "$STORE"' EXIT
 
+registry_login() {
+  local registry="$1" uid="${SUDO_UID:-$(id -u)}" user home
+  if (( EUID == 0 )) && [[ -n ${SUDO_UID:-} ]]; then
+    IFS=: read -r user _ _ _ _ home _ < <(getent passwd "$uid")
+    runuser -u "$user" -- env HOME="$home" XDG_RUNTIME_DIR="/run/user/$uid" podman login "$registry"
+  else
+    podman login "$registry"
+  fi
+  SKOPEO=(skopeo inspect --authfile "$AUTH"); PULL_AUTH=(--authfile "$AUTH")
+}
+
 while read -r ref; do
   echo "FETCH metadata $ref"
-  data=$("${SKOPEO[@]}" "docker://$ref")
+  if ! data=$("${SKOPEO[@]}" "docker://$ref" 2>"$tmp.auth"); then
+    cat "$tmp.auth" >&2
+    grep -Eqi 'unauthorized|authentication required|requested access .* denied' "$tmp.auth" || exit 1
+    registry_login "${ref%%/*}"
+    data=$("${SKOPEO[@]}" "docker://$ref")
+  fi
   echo "ONLINE $ref $(jq -r '.Digest' <<<"$data") ($(jq '.Layers | length' <<<"$data") layers)"
   jq --arg ref "$ref" '{ref:$ref,digest:.Digest,layers:.Layers}' <<<"$data" >>"$tmp"
 done < <(jq -r '.images[]' "$SOT")
