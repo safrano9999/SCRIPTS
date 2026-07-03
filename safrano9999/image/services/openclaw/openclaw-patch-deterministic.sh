@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-tag="${OPENCLAW_PATCH_TAG:-2026.6.11-deterministic.1}"
-asset="${OPENCLAW_PATCH_ASSET:-openclaw-2026.6.11-deterministic-d0c7c00a.tar.gz}"
-url="${OPENCLAW_PATCH_URL:-https://github.com/safrano9999/openclaw/releases/download/$tag}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-
-curl -fsSL --retry 3 "$url/$asset" -o "$tmp/$asset"
-curl -fsSL --retry 3 "$url/$asset.sha256" -o "$tmp/$asset.sha256"
-(cd "$tmp" && sha256sum -c "$asset.sha256")
+releases="$(curl -fsSL --retry 3 'https://api.github.com/repos/safrano9999/openclaw/releases?per_page=100')"
+IFS=$'\t' read -r archive_url checksum_url < <(jq -r 'first(.[] | select(.draft == false) | .assets as $assets | ($assets[] | select(.name | test("^openclaw-.*-deterministic-.*\\.tar\\.gz$"))) as $archive | ($assets[] | select(.name == ($archive.name + ".sha256"))) as $checksum | [$archive.browser_download_url, $checksum.browser_download_url] | @tsv)' <<<"$releases")
+archive="${archive_url##*/}"
+curl -fsSL --retry 3 "$archive_url" -o "$tmp/$archive"
+curl -fsSL --retry 3 "$checksum_url" -o "$tmp/$archive.sha256"
+(cd "$tmp" && sha256sum -c "$archive.sha256")
 rm -rf /app/dist
-tar -xzf "$tmp/$asset" -C /app
+tar -xzf "$tmp/$archive" -C /app
 node /app/openclaw.mjs --version
+openclaw config set agents.defaults.models '{"dummy/dummy":{},"dummy/note":{}}' --strict-json --replace
+openclaw config set agents.defaults.model.primary '"dummy/dummy"' --strict-json
