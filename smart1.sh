@@ -44,8 +44,8 @@ tmp=$(mktemp); trap 'rm -f "$tmp"*; chmod -R a+rX "$STORE"' EXIT
 
 registry_login() {
   local registry="$1" uid="${SUDO_UID:-$(id -u)}" user home login_user login_secret
-  read -rp "$registry username: " login_user
-  read -rsp "$registry password/token: " login_secret; echo
+  read -rp "$registry username: " login_user </dev/tty
+  read -rsp "$registry password/token: " login_secret </dev/tty; echo >/dev/tty
   if (( EUID == 0 )) && [[ -n ${SUDO_UID:-} ]]; then
     IFS=: read -r user _ _ _ _ home _ < <(getent passwd "$uid")
     printf '%s\n' "$login_secret" | runuser -u "$user" -- env HOME="$home" XDG_RUNTIME_DIR="/run/user/$uid" podman login --username "$login_user" --password-stdin "$registry"
