@@ -20,6 +20,17 @@ def openclaw_json(*args: str) -> dict:
         return {}
 
 
+def available_models(provider: str) -> dict[str, dict]:
+    catalog = openclaw_json("models", "list", "--all", "--provider", provider, "--json")
+    return {
+        model["key"]: {}
+        for model in catalog.get("models", [])
+        if model.get("key")
+        and model.get("available") is True
+        and model.get("missing") is False
+    }
+
+
 def main() -> None:
     status = openclaw_json("models", "status", "--json")
     auth_providers = status.get("auth", {}).get("providers", [])
@@ -38,12 +49,13 @@ def main() -> None:
     if os.environ.get("SAKANA_API_KEY"):
         providers.add("sakana")
 
-    models: dict[str, dict] = {}
+    models = available_models("dummy")
+    if models:
+        providers.add("dummy")
+
     for provider in sorted(providers):
-        catalog = openclaw_json("models", "list", "--all", "--provider", provider, "--json")
-        for model in catalog.get("models", []):
-            if model.get("available") is True and model.get("missing") is False:
-                models[model["key"]] = {}
+        if provider != "dummy":
+            models.update(available_models(provider))
 
     if models:
         subprocess.run(
