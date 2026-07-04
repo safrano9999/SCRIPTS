@@ -9,9 +9,11 @@ archive="${archive_url##*/}"
 curl -fsSL --retry 3 "$archive_url" -o "$tmp/$archive"
 curl -fsSL --retry 3 "$checksum_url" -o "$tmp/$archive.sha256"
 (cd "$tmp" && sha256sum -c "$archive.sha256")
-rm -rf /app/dist
-tar -xzf "$tmp/$archive" -C /app
-node /app/openclaw.mjs --version
+openclaw_root="$(dirname "$(readlink -f "$(command -v openclaw)")")"
+[ -f "$openclaw_root/openclaw.mjs" ] || { echo "OpenClaw root not found: $openclaw_root" >&2; exit 1; }
+rm -rf "$openclaw_root/dist"
+tar -xzf "$tmp/$archive" -C "$openclaw_root"
+node "$openclaw_root/openclaw.mjs" --version
 models="$(openclaw config get agents.defaults.models --json 2>/dev/null || printf '{}\n')"
 models="$(jq -c 'if type == "object" then . else {} end | . + {"dummy/dummy": {}, "dummy/note": {}}' <<<"$models")"
 openclaw config set agents.defaults.models "$models" --strict-json
