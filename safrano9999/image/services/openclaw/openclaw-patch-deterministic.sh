@@ -12,5 +12,10 @@ curl -fsSL --retry 3 "$checksum_url" -o "$tmp/$archive.sha256"
 rm -rf /app/dist
 tar -xzf "$tmp/$archive" -C /app
 node /app/openclaw.mjs --version
-openclaw config set agents.defaults.models '{"dummy/dummy":{},"dummy/note":{}}' --strict-json --replace
-openclaw config set agents.defaults.model.primary '"dummy/dummy"' --strict-json
+models="$(openclaw config get agents.defaults.models --json 2>/dev/null || printf '{}\n')"
+models="$(jq -c 'if type == "object" then . else {} end | . + {"dummy/dummy": {}, "dummy/note": {}}' <<<"$models")"
+openclaw config set agents.defaults.models "$models" --strict-json
+if ! openclaw config get agents.defaults.model.primary --json 2>/dev/null \
+    | jq -e 'type == "string" and length > 0' >/dev/null; then
+    openclaw config set agents.defaults.model.primary '"dummy/dummy"' --strict-json
+fi
