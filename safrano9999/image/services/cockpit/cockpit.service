@@ -1,0 +1,11 @@
+[Unit]
+Description=Cockpit Web Service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/libexec/cockpit-ws --port=9090 --no-tls
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
