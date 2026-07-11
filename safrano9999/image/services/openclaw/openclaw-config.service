@@ -10,6 +10,7 @@ PassEnvironment=OPENCLAW_START OPENCLAW_GATEWAY_TOKEN OPENCLAW_GATEWAY_PORT OPEN
 # Fedora OpenAI-v1 provider variables are activated by the image drop-in.
 ExecCondition=/bin/bash -c '[ "$${OPENCLAW_START:-1}" = "1" ]'
 ExecStart=/usr/local/bin/openclaw-configure
+ExecStartPost=/usr/local/bin/openclaw-llm-ephemeral-autodiscoverer
 TimeoutStartSec=180
 
 [Install]
