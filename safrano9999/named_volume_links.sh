@@ -40,6 +40,8 @@ link_package_path() {
 
 for spec in "${specs[@]}"; do
     IFS='|' read -r mount source target kind <<< "$spec"
+    [ -z "${NAMED_VOLUME_ONLY_MOUNT:-}" ] || [ "$mount" = "$NAMED_VOLUME_ONLY_MOUNT" ] || continue
+    case ";${NAMED_VOLUME_SKIP_MOUNTS:-};" in *";$mount;"*) continue ;; esac
     [ -n "$source" ] && [ -n "$target" ] || continue
     target="$(resolve_target "$target")"
     explicit_sources[$source]=1
