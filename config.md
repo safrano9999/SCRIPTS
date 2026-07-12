@@ -90,9 +90,10 @@ Blank lines reset pending one-shot directives such as `#required`, `#secret`,
 Existing values are preserved. Required keys are only prompted again if the key
 is absent or present with an empty value.
 
-If a key is being configured for `config.conf`, an existing value in `.env` is
-used as a migration source. If a key is being configured for `container.conf`,
-existing values in `config.conf` or `.env` are used as migration sources.
+If a non-empty key already exists in another runtime configuration file, it is
+left there and reported as `exists in <file>`. `config.sh` does not copy or move
+the value into the current target. Runtime files are loaded together, so a key
+must have only one owner among `.env`, `config.conf`, and `container.conf`.
 
 After configuration, the target file is rewritten against its example file so
 comments and ordering from the example are preserved. Unknown local keys are
@@ -694,4 +695,3 @@ Other repos do not automatically get `file` as a backend choice.
 - `config.sh` does not install plugins.
 - `#default-preset` is documentation unless the following `KEY=value` line also
   contains that value.
-
