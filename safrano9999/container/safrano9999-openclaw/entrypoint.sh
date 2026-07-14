@@ -48,8 +48,8 @@ if [ -f "${zdir}/scripts/gmail-init-labels" ]; then
   fi
 fi
 
+kdir="${OPENCLAW_CONFIG_DIR:-/root/.openclaw}/extensions/kachelmann"
 if [ -n "${KACHELMANN_PORT:-}" ]; then
-  kdir="${OPENCLAW_CONFIG_DIR:-/root/.openclaw}/extensions/kachelmann"
   if [ -f "${kdir}/webui.py" ]; then
     log "starting KACHELMANN WebUI on 0.0.0.0:${KACHELMANN_PORT}"
     ( cd "${kdir}" && exec python3 -m uvicorn webui:app --host 0.0.0.0 --port "${KACHELMANN_PORT}" ) \
@@ -60,6 +60,16 @@ if [ -n "${KACHELMANN_PORT:-}" ]; then
     done
   else
     log "WARN: KACHELMANN webui.py missing - WebUI not started"
+  fi
+fi
+
+if [ -n "${KACHELMANN_MCP_PORT:-}" ]; then
+  if [ -f "${kdir}/kachelmann/mcp_server.py" ]; then
+    log "starting KACHELMANN MCP HTTP on 0.0.0.0:${KACHELMANN_MCP_PORT}/mcp"
+    ( cd "${kdir}" && exec python3 -m kachelmann.mcp_server --transport streamable-http ) \
+      >/var/log/kachelmann-mcp-http.log 2>&1 &
+  else
+    log "WARN: KACHELMANN MCP server missing - HTTP MCP not started"
   fi
 fi
 
