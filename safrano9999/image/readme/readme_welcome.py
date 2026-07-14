@@ -168,10 +168,10 @@ def build_pdf() -> Path:
     )
     add_section(
         story,
-        "Flatnotes",
-        "Flatnotes serves the Markdown workspace from <b>FLATNOTES_PATH</b>. "
-        "In this instance it can point to the persistent Hermes Obsidian directory "
-        "while the Flatnotes service itself remains image-managed.",
+        "Vditor Notes",
+        "Vditor Notes serves the Markdown workspace from <b>VDITOR_NOTES_PATH</b>. "
+        "It provides recursive file management and a Vditor editor while the "
+        "workspace can remain in the persistent Hermes Obsidian directory.",
         pdf_styles,
     )
 
