@@ -107,8 +107,7 @@ def main():
         for index, candidate in enumerate(names, 1):
             print(f"    ({index}) {candidate} ({label(modes[candidate])})", file=sys.stderr)
         new_index = len(names) + 1
-        next_label = f"next: {label(next_nr)}" if next_nr else "TUN"
-        print(f"    ({new_index}) new ({next_label})\n", file=sys.stderr)
+        print(f"    ({new_index}) new\n", file=sys.stderr)
         choice = ask(f"  Choose [1-{new_index}] (default: {default_index}): ") or str(default_index)
         if choice == str(new_index):
             name, is_new = ask("  New container name: "), True
