@@ -54,7 +54,9 @@ def write_nr(path, value):
 
 
 def label(value):
-    return f"{value}0-{value + 1}0" if isinstance(value, int) else value or "manual"
+    if isinstance(value, int):
+        return f"Portrange {value * 10000} - {(value + 1) * 10000 - 1}"
+    return value or "manual"
 
 
 def ask(prompt):
