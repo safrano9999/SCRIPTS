@@ -414,6 +414,27 @@ uvicorn webui:app --host 0.0.0.0 --port <first-port>
 
 `*_PUBLISH_PORT` generates published port mappings.
 
+Container image setup scripts use the shared `container_instance.py` helper to
+persist `CONTAINER_NR` in `<container>_container.conf`:
+
+- `TUN` is the default for new instances.
+- Blank means manual publish-port configuration.
+- `2` through `5` select the blocks `20000-29999` through `50000-59999`.
+- `TUN` disables all host port publishing while retaining normal container
+  networking for an in-container Tailscale or Cloudflare tunnel.
+
+With a numeric block, publish-port presets must be below `20000`. The last four
+digits are retained, so block `3` projects `11002` to `31002`, `8077` to
+`38077`, and `13333-13340` to `33333-33340`. Internal `*_PORT` values do not
+change. If more than one publish port is missing, `config.sh` asks once whether
+all projected defaults should be accepted. That answer is runtime-only; only
+the resulting ports and `CONTAINER_NR` are persisted.
+
+The shared Python helper owns instance discovery, range labels, explicit range
+selection, and migration into `CONTAINER/<name>/`. `config.sh` only applies the
+selected mode while processing `container*example` files. It does not infer or
+reserve ranges across separate image repositories.
+
 For a key:
 
 ```text
