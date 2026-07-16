@@ -237,6 +237,13 @@ Current example:
 
 This lets a Nextcloud account count as complete even if file sync is blank.
 
+### `#repeat-freeform: FIELD...`
+
+Keeps the first repeat entry's preset and choices, but clears both for later
+indexed entries. The group still uses the normal `skip/new` prompt. This lets
+the first `ADDITIONAL_LINE` offer known network modes while
+`ADDITIONAL_LINE_02`, `_03`, and later entries accept arbitrary Quadlet lines.
+
 ### `${REPEAT_SUFFIX}`
 
 Within defaults in a repeat group, `${REPEAT_SUFFIX}` is replaced as:
