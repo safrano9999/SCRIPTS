@@ -1,15 +1,16 @@
 [Unit]
-Description=Tailscale up (authkey join)
+Description=Tailscale state restore or authkey join
 After=tailscaled.service
 Wants=tailscaled.service
 
 [Service]
 Type=oneshot
-PassEnvironment=TS_AUTHKEY TS_HOSTNAME TS_EXTRA_ARGS
-ExecCondition=/bin/bash -c '[ -n "$$TS_AUTHKEY" ]'
-ExecStart=/bin/bash -c 'args=(up --authkey="$$TS_AUTHKEY" --accept-routes --accept-dns); if [ -n "$$TS_EXTRA_ARGS" ]; then read -r -a extra <<< "$$TS_EXTRA_ARGS"; args+=("$${extra[@]}"); fi; [ -n "$$TS_HOSTNAME" ] && args+=(--hostname="$$TS_HOSTNAME"); exec /usr/bin/tailscale "$${args[@]}"'
+PassEnvironment=TS_AUTHKEY TS_HOSTNAME TS_EXTRA_ARGS TS_STATE_DIR
+Environment=TS_STATE_DIR=/var/lib/tailscale
+ExecCondition=/bin/bash -c '[ -n "$$TS_AUTHKEY" ] || [ -s "$${TS_STATE_DIR:-/var/lib/tailscale}/tailscaled.state" ]'
+ExecStart=/usr/local/bin/tailscale-state-up.sh
 RemainAfterExit=yes
-TimeoutStartSec=30
+TimeoutStartSec=40
 
 [Install]
 WantedBy=multi-user.target
