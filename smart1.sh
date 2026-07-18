@@ -1,14 +1,49 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SMART_STORAGE="${SMART_STORAGE:-/var/lib/shared-containers/storage}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+SOT="$SCRIPT_DIR/images.json"
 
 if [[ " $* " == *" --help "* ]]; then
   printf '%s\n' \
     '--init    Create a skeletal images.json; fail if it exists.' \
+    '--doctor  Normalize images.json from JSON5 to strict JSON.' \
     '--user    Clean only the current user Podman store.' \
     '--prune   Protect running old layers of JSON-listed images.' \
     '--update  Pull JSON-listed images after cleanup.' \
     '--help    Show this help.'
+  exit 0
+fi
+
+doctor_images() {
+  local doctor_tmp
+  command -v json5 >/dev/null || { echo "ERROR: json5 is required" >&2; exit 1; }
+  command -v jq >/dev/null || { echo "ERROR: jq is required" >&2; exit 1; }
+  [[ -f $SOT ]] || { echo "ERROR: $SOT does not exist" >&2; exit 1; }
+
+  doctor_tmp="$(mktemp --tmpdir="$SCRIPT_DIR" .images.json.doctor.XXXXXX)"
+  trap 'rm -f -- "$doctor_tmp"' EXIT
+  json5 -s 2 -o "$doctor_tmp" "$SOT"
+  jq -e '
+    type == "object"
+    and .schemaVersion == 1
+    and ((.images | type) == "array")
+    and all(.images[]; type == "string")
+    and (((.disabled // []) | type) == "array")
+    and all((.disabled // [])[]; type == "string")
+  ' "$doctor_tmp" >/dev/null || {
+    echo "ERROR: images.json has an invalid schema" >&2
+    exit 1
+  }
+  chmod --reference="$SOT" "$doctor_tmp"
+  (( EUID != 0 )) || chown --reference="$SOT" "$doctor_tmp"
+  mv -f -- "$doctor_tmp" "$SOT"
+  trap - EXIT
+  echo "DOCTOR normalized $SOT"
+}
+
+if [[ " $* " == *" --doctor "* ]]; then
+  doctor_images
   exit 0
 fi
 
@@ -35,8 +70,9 @@ if [[ " $* " == *" --user "* ]]; then
   exit 0
 fi
 
+doctor_images
+
 STORE="$SMART_STORAGE"
-SOT="$(cd -- "$(dirname -- "$0")" && pwd)/images.json"
 AUTH=/run/user/${SUDO_UID:-$(id -u)}/containers/auth.json
 SKOPEO=(skopeo inspect)
 PULL_AUTH=(); [[ -r "$AUTH" ]] && SKOPEO+=(--authfile "$AUTH") && PULL_AUTH=(--authfile "$AUTH")
