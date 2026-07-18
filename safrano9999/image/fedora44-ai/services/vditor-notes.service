@@ -1,0 +1,16 @@
+[Unit]
+Description=Vditor Markdown workspace
+After=fedora44-ai.service
+Requires=fedora44-ai.service
+
+[Service]
+Type=simple
+WorkingDirectory=/usr/local/lib/vditor-notes
+PassEnvironment=VDITOR_NOTES_PATH VDITOR_NOTES_PORT
+ExecStartPre=/usr/bin/mkdir -p ${VDITOR_NOTES_PATH}
+ExecStart=/usr/bin/python3 -m uvicorn app:app --host 0.0.0.0 --port ${VDITOR_NOTES_PORT} --proxy-headers --forwarded-allow-ips=*
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

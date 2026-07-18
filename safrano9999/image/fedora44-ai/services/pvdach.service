@@ -1,0 +1,14 @@
+[Unit]
+Description=PV_D-A-CH
+After=network.target tailscale-up.service
+Wants=tailscale-up.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/safrano9999/PV_D-A-CH
+PassEnvironment=FASTAPI_HOST PV_DACH_PORT PV_DACH_DB_BACKEND PV_DACH_DB_HOST PV_DACH_DB_PORT PV_DACH_DB_NAME PV_DACH_DB_USER PV_DACH_DB_PW PV_DACH_DB_PREFIX OPENAI_V1_PROVIDER OPENAI_V1_URL OPENAI_V1_PORT OPENAI_V1_KEY PV_DACH_OPENAI_V1_DEFAULT_LLM
+ExecStart=uvicorn webui:app --host 0.0.0.0 --port ${PV_DACH_PORT}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

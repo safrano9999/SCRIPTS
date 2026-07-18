@@ -1,0 +1,11 @@
+[Unit]
+Description=Fedora44 AI deterministic initialization
+Before=openclaw-config.service openclaw-safrano9999.service openclaw.service hermes.service hermes-dashboard.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/fedora44-ai-init
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

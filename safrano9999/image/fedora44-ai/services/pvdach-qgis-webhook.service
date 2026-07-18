@@ -1,0 +1,15 @@
+[Unit]
+Description=PV_D-A-CH QGIS webhook
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/safrano9999/PV_D-A-CH
+PassEnvironment=PV_DACH_QGIS_WEBHOOK_SERVER_ON PV_DACH_QGIS_WEBHOOK_SERVER_PORT PV_DACH_QGIS_WEBHOOK_SERVER_TOKEN
+ExecCondition=/bin/bash -c 'case "$${PV_DACH_QGIS_WEBHOOK_SERVER_ON,,}" in 1|true|yes|on) exit 0 ;; *) exit 1 ;; esac'
+ExecStart=/usr/bin/python3 qgis-webhook-launcher.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

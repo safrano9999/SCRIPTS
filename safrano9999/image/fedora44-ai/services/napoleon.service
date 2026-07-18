@@ -1,0 +1,14 @@
+[Unit]
+Description=Napoleon Mastermind
+After=network.target tailscale-up.service
+Wants=tailscale-up.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/safrano9999/NAPOLEON_HILLS_AI_MASTERMIND_CLASSES
+PassEnvironment=FASTAPI_HOST NAPOLEON_PORT OPENAI_V1_PROVIDER OPENAI_V1_URL OPENAI_V1_PORT OPENAI_V1_KEY NAPOLEON_OPENAI_V1_DEFAULT_LLM
+ExecStart=uvicorn webui:app --host 0.0.0.0 --port ${NAPOLEON_PORT}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

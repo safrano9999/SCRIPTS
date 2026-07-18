@@ -1,0 +1,16 @@
+[Unit]
+Description=NaturalGrounding
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/safrano9999/NaturalGrounding-Tiktok-Ying-Video-Manager
+PassEnvironment=FASTAPI_HOST NATURALGROUNDING_PORT NATURALGROUNDING_VIDEOS_DIR
+PassEnvironment=NATURALGROUNDING_DB_BACKEND NATURALGROUNDING_DB_PREFIX NATURALGROUNDING_DB_NAME NATURALGROUNDING_DB_USER NATURALGROUNDING_DB_PW NATURALGROUNDING_DB_URL NATURALGROUNDING_DB_PORT
+PassEnvironment=NATURALGROUNDING_DJANGO_SECRET_KEY NATURALGROUNDING_ADMIN_EMAIL NATURALGROUNDING_ADMIN_PASSWORD
+ExecStart=/opt/safrano9999/NaturalGrounding-Tiktok-Ying-Video-Manager/start.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

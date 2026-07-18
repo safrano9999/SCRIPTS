@@ -1,0 +1,18 @@
+[Unit]
+Description=Install safrano9999 OpenClaw plugins
+After=openclaw-config.service
+Requires=openclaw-config.service
+Before=openclaw.service
+
+[Service]
+Type=oneshot
+PassEnvironment=OPENCLAW_START OPENCLAW_CONFIG OPENCLAW_BIN OPENCLAW_CRONTAB OPENCLAW_TELEGRAM_CHAT_ID SAFRANO9999_ROUTINES_CRONTAB SAFRANO9999_ROUTINES_TZ
+ExecCondition=/bin/bash -c '[ "$${OPENCLAW_START:-1}" = "1" ]'
+ExecStart=/usr/local/bin/openclaw-safrano9999
+ExecStartPost=/bin/systemctl start kachelmann-webui.service
+ExecStartPost=/bin/systemctl start kachelmann-mcp-http.service
+RemainAfterExit=yes
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

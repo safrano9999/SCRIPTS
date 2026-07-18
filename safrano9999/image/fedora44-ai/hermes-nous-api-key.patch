@@ -1,0 +1,120 @@
+diff --git a/agent/credential_pool.py b/agent/credential_pool.py
+index 8e24ffe49..af8bcdd38 100644
+--- a/agent/credential_pool.py
++++ b/agent/credential_pool.py
+@@ -219,9 +219,10 @@ class PooledCredential:
+ 
+     @property
+     def runtime_api_key(self) -> str:
+-        if self.provider == "nous":
++        if self.provider == "nous" and self.auth_type == AUTH_TYPE_OAUTH:
+             # Nous stores the runtime inference credential in agent_key for
+-            # compatibility. It must be a NAS invoke JWT.
++            # OAuth compatibility. It must be a NAS invoke JWT. Direct API-key
++            # credentials use access_token like every other API-key provider.
+             for token, expires_at in (
+                 (self.agent_key, self.agent_key_expires_at),
+                 (self.access_token, self.expires_at),
+@@ -2242,7 +2243,7 @@ def _seed_from_env(provider: str, entries: List[PooledCredential]) -> Tuple[bool
+         return changed, active_sources
+ 
+     pconfig = PROVIDER_REGISTRY.get(provider)
+-    if not pconfig or pconfig.auth_type != AUTH_TYPE_API_KEY:
++    if not pconfig or not pconfig.api_key_env_vars:
+         return changed, active_sources
+ 
+     env_url = ""
+diff --git a/hermes_cli/auth.py b/hermes_cli/auth.py
+index ad2c48037..14e2e8504 100644
+--- a/hermes_cli/auth.py
++++ b/hermes_cli/auth.py
+@@ -182,6 +182,7 @@ PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
+         inference_base_url=DEFAULT_NOUS_INFERENCE_URL,
+         client_id=DEFAULT_NOUS_CLIENT_ID,
+         scope=DEFAULT_NOUS_SCOPE,
++        api_key_env_vars=("NOUS_API_KEY",),
+     ),
+     "openai-codex": ProviderConfig(
+         id="openai-codex",
+@@ -1605,7 +1606,7 @@ def is_provider_explicitly_configured(provider_id: str) -> bool:
+     # not by the user explicitly configuring anthropic in Hermes.
+     _IMPLICIT_ENV_VARS = {"CLAUDE_CODE_OAUTH_TOKEN"}
+     pconfig = PROVIDER_REGISTRY.get(normalized)
+-    if pconfig and pconfig.auth_type == "api_key":
++    if pconfig and pconfig.api_key_env_vars:
+         for env_var in pconfig.api_key_env_vars:
+             if env_var in _IMPLICIT_ENV_VARS:
+                 continue
+@@ -1865,9 +1866,10 @@ def resolve_provider(
+     except Exception as e:
+         logger.debug("Could not pre-read active auth provider: %s", e)
+ 
+-    # Auto-detect API-key providers by checking their env vars
++    # Auto-detect providers with API-key credentials, including providers whose
++    # primary interactive auth flow is OAuth (for example Nous).
+     for pid, pconfig in PROVIDER_REGISTRY.items():
+-        if pconfig.auth_type != "api_key":
++        if not pconfig.api_key_env_vars:
+             continue
+         # GitHub tokens are commonly present for repo/tool access but should not
+         # hijack inference auto-selection unless the user explicitly chooses
+diff --git a/hermes_cli/nous_auth_keepalive.py b/hermes_cli/nous_auth_keepalive.py
+index 947bbd178..3911175af 100644
+--- a/hermes_cli/nous_auth_keepalive.py
++++ b/hermes_cli/nous_auth_keepalive.py
+@@ -54,7 +54,7 @@ def _refresh_selected_pool_entry(
+     pool exists but no entry can be used, and None when no Nous pool exists.
+     """
+     try:
+-        from agent.credential_pool import load_pool
++        from agent.credential_pool import AUTH_TYPE_API_KEY, load_pool
+ 
+         pool = load_pool("nous")
+     except Exception as exc:
+@@ -73,6 +73,9 @@ def _refresh_selected_pool_entry(
+     if entry is None:
+         return False
+ 
++    if getattr(entry, "auth_type", None) == AUTH_TYPE_API_KEY:
++        return bool(getattr(entry, "runtime_api_key", None))
++
+     access_expiring = _is_expiring(
+         getattr(entry, "expires_at", None),
+         ACCESS_TOKEN_REFRESH_SKEW_SECONDS,
+diff --git a/hermes_cli/providers.py b/hermes_cli/providers.py
+index 2880b33fc..4ff44edfe 100644
+--- a/hermes_cli/providers.py
++++ b/hermes_cli/providers.py
+@@ -57,6 +57,7 @@ HERMES_OVERLAYS: Dict[str, HermesOverlay] = {
+     "nous": HermesOverlay(
+         transport="openai_chat",
+         auth_type="oauth_device_code",
++        extra_env_vars=("NOUS_API_KEY",),
+         base_url_override="https://inference-api.nousresearch.com/v1",
+     ),
+     "openai-codex": HermesOverlay(
+diff --git a/hermes_cli/runtime_provider.py b/hermes_cli/runtime_provider.py
+index fba92e9b3..8d346d149 100644
+--- a/hermes_cli/runtime_provider.py
++++ b/hermes_cli/runtime_provider.py
+@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
+ 
+ from hermes_cli import auth as auth_mod
+ from agent.credential_pool import (
++    AUTH_TYPE_OAUTH,
+     CredentialPool,
+     PooledCredential,
+     credential_pool_matches_provider,
+@@ -1709,7 +1710,11 @@ def resolve_runtime_provider(
+         # non-runtime contexts like `hermes auth list`). If the key is
+         # expired/missing, refresh the selected pool entry before falling back
+         # to singleton auth resolution.
+-        if provider == "nous" and entry is not None:
++        if (
++            provider == "nous"
++            and entry is not None
++            and getattr(entry, "auth_type", AUTH_TYPE_OAUTH) == AUTH_TYPE_OAUTH
++        ):
+             min_ttl = max(60, env_int("HERMES_NOUS_MIN_KEY_TTL_SECONDS", 1800))
+             nous_state = {
+                 "agent_key": getattr(entry, "agent_key", None),
