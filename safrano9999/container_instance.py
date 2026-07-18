@@ -67,7 +67,6 @@ def ask(prompt):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("repo", type=Path)
-    parser.add_argument("default")
     parser.add_argument("--name", default="")
     args = parser.parse_args()
     repo = args.repo.resolve()
@@ -86,7 +85,6 @@ def main():
             if old.exists() and not new.exists():
                 old.replace(new)
 
-    (instances / args.default).mkdir(parents=True, exist_ok=True)
     names = sorted(path.name for path in instances.iterdir() if path.is_dir())
     modes = {
         candidate: mode(instances / candidate / f"{candidate}_container.conf")
@@ -95,31 +93,33 @@ def main():
     highest = max((value for value in modes.values() if isinstance(value, int)), default=1)
     next_nr = highest + 1 if highest < 5 else None
 
-    def initialized(name):
-        directory = instances / name
-        return any((directory / pattern.format(name=name)).exists() for pattern in FILES)
-
     name = args.name
-    is_new = bool(name and not initialized(name))
+    is_new = bool(name and name not in names)
+    default_name = names[0] if names else ""
     if not name and not sys.stdin.isatty():
-        name, is_new = args.default, not initialized(args.default)
+        if not default_name:
+            raise SystemExit("No container exists; pass INSTANCE")
+        name, is_new = default_name, False
     elif not name:
-        default_index = names.index(args.default) + 1
-        print("\n  Container:", file=sys.stderr)
-        for index, candidate in enumerate(names, 1):
-            print(f"    ({index}) {candidate} ({label(modes[candidate])})", file=sys.stderr)
-        new_index = len(names) + 1
-        print(f"    ({new_index}) new\n", file=sys.stderr)
-        choice = ask(f"  Choose [1-{new_index}] (default: {default_index}): ") or str(default_index)
-        if choice == str(new_index):
+        if not names:
             name, is_new = ask("  New container name: "), True
-            if name in names:
-                raise SystemExit(f"Container already exists: {name}")
-        elif choice.isdigit() and 1 <= int(choice) <= len(names):
-            name = names[int(choice) - 1]
-            is_new = not initialized(name)
         else:
-            raise SystemExit(f"Invalid container choice: {choice}")
+            new_index = len(names) + 1
+            default_index = names.index(default_name) + 1
+            print("\n  Container:", file=sys.stderr)
+            for index, candidate in enumerate(names, 1):
+                print(f"    ({index}) {candidate} ({label(modes[candidate])})", file=sys.stderr)
+            print(f"    ({new_index}) new\n", file=sys.stderr)
+            choice = ask(f"  Choose [1-{new_index}] (default: {default_index}): ") or str(default_index)
+            if choice == str(new_index):
+                name, is_new = ask("  New container name: "), True
+                if name in names:
+                    raise SystemExit(f"Container already exists: {name}")
+            elif choice.isdigit() and 1 <= int(choice) <= len(names):
+                name = names[int(choice) - 1]
+                is_new = False
+            else:
+                raise SystemExit(f"Invalid container choice: {choice}")
 
     if not NAME_RE.fullmatch(name):
         raise SystemExit(f"Invalid container name: {name}")
