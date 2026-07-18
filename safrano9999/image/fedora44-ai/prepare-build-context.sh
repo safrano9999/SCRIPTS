@@ -49,8 +49,8 @@ relink_build_files() {
     link_tree "$SOT/services" "$BUILD/services"
     link_file "$SOT/hermes-nous-api-key.patch" "$BUILD/hermes-nous-api-key.patch"
     link_file "$SOT/resolve-build-inputs.sh" "$BUILD/resolve-build-inputs.sh"
-    link_file "$SOT/build.conf" "$CONTEXT/build.conf"
     link_file "$SOT/prepare-build-context.sh" "$CONTEXT/prepare-build-context.sh"
+    [ -f "$CONTEXT/build.conf" ] || { echo "Missing build.conf in $CONTEXT" >&2; exit 1; }
 
     local shared="$SCRIPTS_ROOT/safrano9999/image/services"
     link_file "$shared/cloudflare/cloudflared.service" "$BUILD/services/cloudflared.service"
