@@ -61,17 +61,13 @@ def read_specs() -> tuple[dict[str, str], list[str]]:
 
 
 def resolved_entries() -> dict[str, list[tuple[str, str]]]:
-    specs, order = read_specs()
+    specs, _ = read_specs()
     by_canonical = {canonical_key(key): value for key, value in specs.items()}
-    keys = list(order)
-    for key in sorted(os.environ):
-        if key not in specs and canonical_key(key) in by_canonical:
-            keys.append(key)
-            specs[key] = by_canonical[canonical_key(key)]
-
     result = {section: [] for section in SECTIONS}
-    for key in keys:
-        section = specs[key]
+    for key in sorted(os.environ):
+        section = specs.get(key) or by_canonical.get(canonical_key(key))
+        if not section:
+            continue
         value = env.get(key, "")
         result[section].append((key, value or "blank"))
     return result

@@ -147,12 +147,15 @@ merge_requirements_and_reference() {
     (
         cd "$CONTEXT"
         bash "$merge" "${BASE_REPOS[@]}"
+        python3 "$SCRIPTS_ROOT/safrano9999/image/readme/welcome_ref.py" \
+            "$CONTEXT" "$CONTEXT/ref.base.conf"
         mv -f requirements.txt requirements.base.txt
         bash "$merge" "${SAFRANO_REPOS[@]}"
         mv -f requirements.txt requirements.safrano9999.txt
         bash "$merge"
-        python3 "$SCRIPTS_ROOT/safrano9999/image/readme/welcome_ref.py" "$CONTEXT" "$CONTEXT/ref.conf"
-        rm -f requirements.txt env.example config.conf_example container.example
+        python3 "$SCRIPTS_ROOT/safrano9999/image/readme/welcome_ref.py" \
+            "$CONTEXT" "$CONTEXT/ref.safrano9999.conf"
+        rm -f requirements.txt env.example config.conf_example container.example ref.conf
     )
 }
 
