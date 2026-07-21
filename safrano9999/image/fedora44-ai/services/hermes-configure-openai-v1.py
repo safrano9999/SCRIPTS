@@ -41,7 +41,7 @@ def main() -> None:
         config = {}
 
     configured_model = os.environ.get(
-        "HERMES_OPENAI_V1_DEFAULT_LLM",
+        "HERMES_MODEL",
         DEFAULT_MODEL,
     ).strip()
     providers = discover_openai_v1_runtime_providers(consumer="Hermes")
