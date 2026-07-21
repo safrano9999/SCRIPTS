@@ -247,9 +247,8 @@ matching bot-token variable without hardcoding application-specific names in
 For an empty Chat-ID field the interactive choices are `enter`, `skip`, and
 `discover via /start`. Discovery validates the bot token, asks the user to send
 `/start` to that bot, and polls Telegram until it can store the incoming
-message's `chat.id`. If the Chat ID already has a value, `use same again` is the
-first and default choice. Non-interactive runs preserve an existing value or
-leave an empty value blank.
+message's `chat.id`. An existing Chat ID is retained without another prompt.
+Non-interactive runs leave an empty value blank.
 
 The directive follows repeat-group indexes. For example, when this pair is
 extended, `SOCIALMEDIA_SYNCHER_TELEGRAM_CHATID_2` automatically uses
