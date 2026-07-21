@@ -369,6 +369,17 @@ keys already exists, `config.sh` offers bulk setup:
 
 For `sqlite`, all non-backend DB fields are written as `blank`.
 
+For `on_the_fly`, bulk setup is also available when an environment target has
+multiple database groups. Choosing **use on_the_fly for all** writes that
+backend to every group and blanks every connection field. Choosing
+**configure individually** leaves later groups available for combinations such
+as on-the-fly event handling plus SQLite settings persistence.
+
+Bulk setup is not offered when any field in those database groups is already
+owned by another generated configuration file. This preserves the normal
+cross-file precedence rules and prevents a new `.env` value from shadowing an
+existing `config.conf` or container setting.
+
 For server databases, the script asks for common host, port, name, user, and
 password, then writes all detected DB key groups. Default port:
 
