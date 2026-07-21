@@ -1,0 +1,17 @@
+[Unit]
+Description=SOCIALMEDIA-SYNCHER notification bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/safrano9999/SOCIALMEDIA-SYNCHER
+ExecStart=/usr/bin/python3 /opt/safrano9999/SOCIALMEDIA-SYNCHER/webui.py
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=20s
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+[Install]
+WantedBy=multi-user.target

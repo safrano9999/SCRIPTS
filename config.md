@@ -223,6 +223,7 @@ Current important groups:
 - `ZEROINBOX suffix ZEROINBOX_ONLY_UNSEEN`
 - `NEXTCLOUD suffix02 NEXTCLOUD_URL NEXTCLOUD_USER NEXTCLOUD_PW NEXTCLOUD_SYNC_FOLDERS NEXTCLOUD_TIMER NEXTCLOUD_CALENDAR`
 - `CALENDAR infix CALENDAR_URL CALENDAR_USER CALENDAR_PASSWORD`
+- `SOCIALMEDIA_SYNCHER_TELEGRAM suffix SOCIALMEDIA_SYNCHER_TELEGRAM_BOTTOKEN SOCIALMEDIA_SYNCHER_TELEGRAM_CHATID`
 
 ### `#repeat-optional-complete: FIELD...`
 
@@ -236,6 +237,35 @@ Current example:
 ```
 
 This lets a Nextcloud account count as complete even if file sync is blank.
+
+### `#discover-telegram-chat: BOT_TOKEN_FIELD`
+
+Applies to the next Telegram Chat-ID field. `BOT_TOKEN_FIELD` identifies the
+matching bot-token variable without hardcoding application-specific names in
+`config.sh`.
+
+For an empty Chat-ID field the interactive choices are `enter`, `skip`, and
+`discover via /start`. Discovery validates the bot token, asks the user to send
+`/start` to that bot, and polls Telegram until it can store the incoming
+message's `chat.id`. If the Chat ID already has a value, `use same again` is the
+first and default choice. Non-interactive runs preserve an existing value or
+leave an empty value blank.
+
+The directive follows repeat-group indexes. For example, when this pair is
+extended, `SOCIALMEDIA_SYNCHER_TELEGRAM_CHATID_2` automatically uses
+`SOCIALMEDIA_SYNCHER_TELEGRAM_BOTTOKEN_2`:
+
+```text
+#repeat-group: SOCIALMEDIA_SYNCHER_TELEGRAM suffix SOCIALMEDIA_SYNCHER_TELEGRAM_BOTTOKEN SOCIALMEDIA_SYNCHER_TELEGRAM_CHATID
+SOCIALMEDIA_SYNCHER_TELEGRAM_BOTTOKEN=
+#repeat-optional-complete: SOCIALMEDIA_SYNCHER_TELEGRAM_CHATID
+#discover-telegram-chat: SOCIALMEDIA_SYNCHER_TELEGRAM_BOTTOKEN
+SOCIALMEDIA_SYNCHER_TELEGRAM_CHATID=
+```
+
+`TELEGRAM_DISCOVERY_TIMEOUT_SECONDS` optionally changes the default 120-second
+wait. `TELEGRAM_BOT_API_BASE` exists for compatible endpoints and isolated
+tests; normal runs use `https://api.telegram.org`.
 
 ### `#repeat-freeform: FIELD...`
 
