@@ -8,7 +8,8 @@ fi
 "$ROOT/SCRIPTS/safrano9999/image/check-setup-image-source.sh" \
   "$ROOT/CONTAINER/fedora44-ai-base/setup.sh" \
   "$ROOT/CONTAINER/fedora44-ai-safrano9999/setup.sh" \
-  "$ROOT/CONTAINER/safrano9999-openclaw/setup.sh" || exit 1
+  "$ROOT/CONTAINER/safrano9999-openclaw/setup.sh" \
+  "$ROOT/SOCIALMEDIA-SYNCHER/setup.sh" || exit 1
 
 cd "$ROOT" || exit 1
 for repo in ./* ./CONTAINER/*; do
